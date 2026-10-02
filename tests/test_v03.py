@@ -1,8 +1,10 @@
 import os, sys, shutil, tempfile, unittest, io, contextlib
+from unittest import mock
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'skills', 'debug', 'scripts'))
 sys.path.insert(0, os.path.join(ROOT, 'skills', 'legal-traps', 'scripts'))
 import service_map as SM, log_fetch as LF, legal_traps as LT
+import backends as B
 
 
 def w(root, rel, text):
@@ -32,6 +34,13 @@ data:
 class LogFetch(unittest.TestCase):
     def setUp(self):
         self.d = tempfile.mkdtemp(); w(self.d, 'infra/main.tf', TF); w(self.d, 'k8s/n.yaml', K8S)
+        # Backend detection scores installed CLIs and cloud env vars on top of repo
+        # signals, so an `aws` binary on PATH (every GitHub runner has one) takes
+        # _aws_detect to 3 and outranks the aggregator bonus these tests are about.
+        # Pin both to absent so only the signals each test passes in decide.
+        for p in (mock.patch.object(B, '_cli', lambda name: False),
+                  mock.patch.object(B, '_env_any', lambda *names: False)):
+            p.start(); self.addCleanup(p.stop)
     def tearDown(self): shutil.rmtree(self.d)
     def svc(self, name): return SM.build(self.d)['services'][name]
 
