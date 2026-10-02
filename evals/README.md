@@ -11,7 +11,7 @@ not agent behaviour: the cheating diffs and agent mistakes are scripted.
 | Tamper guard | `python3 evals/tamper_guard.py` | 19 of 19 cheats flagged (15 as FAIL); 0 of 12 honest changes failed |
 | Passing tests vs real checks | `sh evals/mutation/run.sh` | weak suite 24% (8 of 33 bugs caught), strong suite 100% (33 of 33); both suites pass |
 | ratchet vs naive gate | `python3 evals/ratchet_vs_naive.py` | ratchet 7 of 7 correct; naive gate 2 of 7 |
-| Guidance coverage: does the advice name the defects that ship? | `python3 evals/guidance_coverage.py` | overmind 6/6 core and 2/4 extended; superpowers 2/6 and 1/4 |
+| Guidance coverage and defect reachability | `python3 evals/guidance_coverage.py` | overmind 6/6 core, 2/4 extended, 10/10 defects reachable; superpowers 2/6, 1/4, 3/10 |
 | Code quality: does a green suite mean correct code? | `python3 evals/code_quality.py` (`-v` to name each hidden failure) | 6 of 6 candidates pass their own suite; 3 are wrong; 10 hidden defects would have shipped. Mutation score does **not** separate them |
 
 Every row above was re-run at v0.7. `delegation.py`, `ratchet_vs_naive.py` and
@@ -82,6 +82,18 @@ what the guidance covers, not as a measure of breadth.
 **Extended classes** are canonical categories *not* derived from those tasks:
 null handling, large input, concurrency, locale. overmind scores 2/4 and
 superpowers 1/4. That narrow lead is the trustworthy number.
+
+**Defect reachability** is the third number and the one that answers the
+original question. It runs the thin candidates, collects the hidden tests that
+actually fail, and asks for each one whether a library's guidance points you at
+it. overmind reaches 10 of 10, superpowers 3 of 10. The failing set is measured
+on every run rather than hardcoded, and a stale mapping prints a warning and
+fails `tests/test_guidance_coverage.py`.
+
+Note what reachability does *not* fix: the classes still came from these three
+tasks. It weights the score by real defects instead of class count, which is
+better, but it cannot escape that circularity. The extended classes remain the
+only un-circular comparison here.
 
 Neither score says the guidance works. The metric checks that a class is
 *named*, which is necessary and not sufficient; whether naming it changes what

@@ -121,6 +121,66 @@ EXCLUDES = re.compile(
     re.I)
 
 
+# Which defect class each hidden test in code_quality.py belongs to. The test
+# names are verified against that file at runtime, so this mapping cannot drift
+# away from the suites it describes. The class assignment is the judgement here;
+# the list of failing tests is measured, not assumed.
+DEFECT_CLASS = {
+    'test_freeship_never_negative': 'clamp',
+    'test_money_stays_integer': 'numeric_type',
+    'test_rounds_down_not_to_float': 'numeric_type',
+    'test_tiny_amount': 'numeric_type',
+    'test_touching_is_not_overlap': 'boundary',
+    'test_touching_the_other_way': 'boundary',
+    'test_empty_interval_never_overlaps': 'empty',
+    'test_short_last_page': 'partial_last',
+    'test_page_past_the_end_is_empty': 'out_of_range',
+    'test_fewer_items_than_one_page': 'partial_last',
+}
+
+
+def real_defects():
+    """Run the thin candidates and return the hidden tests that actually fail."""
+    import tempfile
+    sys.path.insert(0, HERE)
+    import code_quality as CQ
+    failing = []
+    for task_name, task in CQ.TASKS.items():
+        with tempfile.TemporaryDirectory(prefix='overmind-reach-') as d:
+            CQ._suite(d, task['module'], task['thin'], task['hidden'])
+            _, out = CQ._run(d)
+            for line in out.splitlines():
+                if line.startswith('FAIL:') or line.startswith('ERROR:'):
+                    name = line.split()[1].split('(')[0].strip()
+                    failing.append((task_name, name))
+    return failing
+
+
+def reachability(results, names):
+    """How many real defects each library's guidance would have prompted a test for."""
+    failing = real_defects()
+    unmapped = [n for _, n in failing if n not in DEFECT_CLASS]
+    print('\nDefect reachability: of the defects the thin candidates actually')
+    print('ship, how many does each library\'s guidance point you at?\n')
+    if unmapped:
+        print('  WARNING: unmapped failing tests, mapping is stale: %s' % unmapped)
+    print('  %-36s %-14s %s' % ('failing hidden test', 'class', '  '.join(n[:11].ljust(11) for n in names)))
+    print('  ' + '-' * (36 + 14 + 13 * len(names)))
+    tally = {n: 0 for n in names}
+    for task, test in sorted(failing):
+        cls = DEFECT_CLASS.get(test, '?')
+        cells = []
+        for n in names:
+            covered = cls in results[n] and results[n][cls] is not None
+            tally[n] += bool(covered)
+            cells.append(('yes' if covered else 'NO').ljust(11))
+        print('  %-36s %-14s %s' % (test[:36], cls, '  '.join(cells)))
+    print('  ' + '-' * (36 + 14 + 13 * len(names)))
+    print('  %-36s %-14s %s' % ('reachable', '', '  '.join(
+        ('%d/%d' % (tally[n], len(failing))).ljust(11) for n in names)))
+    return tally
+
+
 def scan(root, files, classes=None):
     """Return {class: (hit, 'file:line  matched text')}."""
     classes = classes or CLASSES
@@ -213,6 +273,8 @@ def main(argv=None):
     print('-' * len(header2))
     ext_totals = {n: sum(1 for c in EXTENDED if ext_results[n][c]) for n in names}
     print('covered'.ljust(width) + ''.join(('%d/%d' % (ext_totals[n], len(EXTENDED))).ljust(14) for n in names))
+
+    reachability(results, names)
 
     best = max(totals, key=lambda n: totals[n])
     tie = list(totals.values()).count(totals[best]) > 1

@@ -75,3 +75,25 @@ class OvermindCoversTheCoreClasses(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ReachabilityMappingIsCurrent(unittest.TestCase):
+    """The defect->class mapping must describe the suites as they are now."""
+
+    def test_every_failing_hidden_test_is_mapped(self):
+        failing = GC.real_defects()
+        self.assertTrue(failing, 'the thin candidates stopped failing; the fixture is broken')
+        unmapped = sorted({n for _, n in failing if n not in GC.DEFECT_CLASS})
+        self.assertEqual(unmapped, [], 'unmapped failing tests: %s' % unmapped)
+
+    def test_every_mapped_class_exists_in_the_taxonomy(self):
+        unknown = sorted({c for c in GC.DEFECT_CLASS.values() if c not in GC.CLASSES})
+        self.assertEqual(unknown, [], 'mapping references unknown classes: %s' % unknown)
+
+    def test_overmind_guidance_reaches_every_measured_defect(self):
+        """Regression guard for the boundary table's practical coverage."""
+        found = GC.scan(ROOT, GC.LIBS['overmind'])
+        failing = GC.real_defects()
+        missed = sorted({GC.DEFECT_CLASS[n] for _, n in failing
+                         if not found.get(GC.DEFECT_CLASS[n])})
+        self.assertEqual(missed, [], 'guidance no longer names: %s' % missed)
