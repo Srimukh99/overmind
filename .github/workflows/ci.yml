@@ -54,3 +54,5 @@ jobs:
         run: python3 evals/delegation.py
       - name: Mutation - weak suite vs strong suite
         run: sh evals/mutation/run.sh
+      - name: Code quality - green suite vs correct code
+        run: python3 evals/code_quality.py

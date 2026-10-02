@@ -11,6 +11,7 @@ not agent behaviour: the cheating diffs and agent mistakes are scripted.
 | Tamper guard | `python3 evals/tamper_guard.py` | 19 of 19 cheats flagged (15 as FAIL); 0 of 12 honest changes failed |
 | Passing tests vs real checks | `sh evals/mutation/run.sh` | weak suite 24% (8 of 33 bugs caught), strong suite 100% (33 of 33); both suites pass |
 | ratchet vs naive gate | `python3 evals/ratchet_vs_naive.py` | ratchet 7 of 7 correct; naive gate 2 of 7 |
+| Code quality: does a green suite mean correct code? | `python3 evals/code_quality.py` (`-v` to name each hidden failure) | 6 of 6 candidates pass their own suite; 3 are wrong; 10 hidden defects would have shipped. Mutation score does **not** separate them |
 
 Every row above was re-run at v0.7. `delegation.py`, `ratchet_vs_naive.py` and
 `mutation/run.sh` need `pytest` (mutation also needs `hypothesis`) and print a
@@ -24,6 +25,46 @@ Token savings from `loop.py` (pytest, 153 tests): ~513 tokens raw to ~129 with 2
 
 Still missing: a with-and-without comparison of real agents on real tasks.
 That needs a model API key; contributions welcome.
+
+## Code quality eval: a negative result worth keeping
+
+`code_quality.py` gives three tasks a `visible` suite of the kind an implementer
+writes from the spec, and a `hidden` acceptance suite they never see. Each task
+has a thin candidate and a solid one. Both pass the visible suite.
+
+Two findings, and the second one is inconvenient:
+
+**A green suite carries no information about correctness.** All six candidates
+pass their own tests; three are wrong, with 10 hidden failures between them.
+That is the same point `mutation/run.sh` makes, from the other direction.
+
+**Mutation score does not predict correctness across implementations, and here
+it is anti-correlated.** Thin candidates averaged 83%, solid ones 62%; in every
+task the thin implementation scored at least as high.
+
+| task | thin | solid |
+| --- | --- | --- |
+| discount | 100% | 93% |
+| overlap | 50% | 33% |
+| pagination | 100% | 60% |
+
+The reason is structural: a thin implementation has fewer mutation sites, and
+the visible suite covers a larger share of them. A solid implementation adds
+guards - `max`, `min`, emptiness checks - that the visible suite never
+exercises, so those mutants survive.
+
+This does not invalidate `mutation/run.sh`. That eval holds one implementation
+fixed and varies the suite, which is the question mutation testing answers:
+*is my suite real?* `code_quality.py` varies the implementation and holds the
+suite style fixed, asking *is my code right?* Mutation score does not answer
+the second question, and a `--min` threshold on it will not catch a thin
+implementation. Treat the score as a property of a suite, never as a grade for
+the code.
+
+What did separate thin from solid: nothing in the toolchain. Only the hidden
+suite, which is to say only writing the boundary cases in the first place.
+That is a guidance gap, not a tooling gap, and it is the target for the
+reference-depth work in `docs/specs/2026-10-02-methodology-depth-design.md`.
 
 ## Routing eval: what it is and is not
 
