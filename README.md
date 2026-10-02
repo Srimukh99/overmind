@@ -1,10 +1,10 @@
 # overmind
 
-**The mind above your agents. Ship like a senior team.**  · v0.7
+**The mind above your agents. Ship like a senior team.** · v0.7
 
 overmind is a lean set of skills that gives your coding agent senior-engineer habits: design before code, test first, debug from evidence, review before merge, and prove it works before saying it's done. It ships 14 core skills that cover the whole job for a small team, plus optional packs for regulated finance and healthcare work, Postgres, MongoDB, Snowflake and Databricks, Kubernetes, and API and agent design.
 
-The heavy lifting is done by small scripts, not the model: logs, manifests and IaC are scanned locally and the agent reads a 20-line summary instead of thousands of lines. That keeps token use low.
+Small scripts do the heavy lifting, not the model. Logs, manifests and IaC are scanned locally, so the agent reads a 20-line summary instead of thousands of lines. That keeps token use low.
 
 It works with any agent that supports the open [Agent Skills](https://agentskills.io) format: Claude Code, Codex, Kiro, Cursor, GitHub Copilot, Gemini CLI and more.
 
@@ -26,7 +26,7 @@ cd your-project
 /path/to/overmind/install.sh --agent all --pack regulated,data   # add packs (or --pack all)
 ```
 
-Core skills are always installed. Packs are opt-in: `regulated`, `data`, `k8s`, `apis-agents`. `npx skills add` installs everything it finds, packs included.
+Core skills always install. Packs are opt-in — `regulated`, `data`, `k8s`, `apis-agents` — but `npx skills add` takes everything it finds, packs included.
 
 **Claude Code plugin**:
 
@@ -36,11 +36,11 @@ Core skills are always installed. Packs are opt-in: `regulated`, `data`, `k8s`, 
 /plugin install overmind-regulated@overmind     # optional packs: overmind-data, overmind-k8s, overmind-apis-agents
 ```
 
-Then just work as usual. The agent picks skills by matching your request to their descriptions; `boot` routes everything else.
+Then work as usual. The agent picks skills by matching your request to their descriptions, and `boot` routes whatever is left.
 
 ## Works with
 
-Skills are loaded by the agent app, not the model, so any model works inside an app that supports the open Agent Skills format.
+The agent app loads skills, not the model, so any model works inside an app that supports the open Agent Skills format.
 
 | Agent | Install | Folder it reads |
 | --- | --- | --- |
@@ -51,7 +51,7 @@ Skills are loaded by the agent app, not the model, so any model works inside an 
 | Cursor | `--agent cursor` | `.cursor/skills/` (also reads `.claude/skills/` and `.agents/skills/`) |
 | Gemini CLI, GitHub Copilot, OpenCode, Roo Code, Goose and others | `npx skills add Srimukh99/overmind` | each agent's own folder |
 
-`--agent all` covers Claude Code, Codex, Kimi Code, Kiro and Qwen Code. Cursor users should install with `--agent cursor` only: Cursor reads several of these folders and would otherwise list every skill twice. The scripts need an agent that can run shell commands, plus Python 3 and git.
+`--agent all` covers Claude Code, Codex, Kimi Code, Kiro and Qwen Code. Install Cursor with `--agent cursor` alone: it reads several of these folders and would otherwise list every skill twice. The scripts need an agent that can run shell commands, plus Python 3 and git.
 
 ## The flow
 
@@ -62,7 +62,7 @@ something breaks: debug (logs → source line → cause → fix)        outage: 
 
 ## Core skills (14)
 
-Each skill opens with a short table of situations and points to one reference file, so the agent reads only what the moment needs.
+Each skill opens with a short table of situations pointing to one reference file, so the agent reads only what the moment needs.
 
 | Skill | Use it for |
 | --- | --- |
@@ -71,9 +71,9 @@ Each skill opens with a short table of situations and points to one reference fi
 | `build` | Isolated worktree, test-first loop built for agents, tiered checks, mutation testing, a guard that catches skipped or weakened tests, plan execution |
 | `ratchet` | Every iteration must improve the code without breaking what works or drifting from the goal: anchors the goal, freezes existing tests, checks each step against a rising floor, reverts bad steps |
 | `delegate` | Contract-first delegation: you write the shared contract, each worker owns its own files and works in its own worktree under `ratchet`, results are verified rather than trusted, and work lands in waves |
-| `debug` | Paste a log and get the error and source line, or name a service and it finds the runtime, cloud and log shipper and queries the right backend (9 clouds, 7 aggregators, never kubectl). Then evidence-based debugging and tracing bad data to its origin. Exports the service map as an Open Knowledge Format bundle any agent can read |
+| `debug` | Paste a log to get the error and its source line, or name a service: it finds the runtime, cloud and log shipper, then queries the right backend (9 clouds, 7 aggregators, never kubectl). From there, evidence-based debugging and tracing bad data to its origin. Exports the service map as an Open Knowledge Format bundle any agent can read |
 | `review` | Independent review ranked by severity, security review of risky changes, handling feedback on its merits |
-| `ship` | Quality and compliance gate before commit and in CI, proof before "done", release checklist with a rollback plan, gradual rollout, clean merge or PR |
+| `ship` | The quality and compliance gate, before commit and in CI; proof before "done"; a release checklist with a rollback plan; gradual rollout; clean merge or PR |
 | `legal-traps` | For vibe coders and new PMs: COPPA, HIPAA pixels, wiretap claims, Google Fonts in the EU, unsubscribe and postal address, hidden fees, auto-renew consent, DMCA agent |
 | `iac-check` | Public databases, open security groups, public buckets, wildcard IAM, privileged pods, secrets in images |
 | `deps-check` | Vulnerable dependencies across Python, Node, Go, Rust and images |
@@ -121,7 +121,7 @@ python3 skills/ship/scripts/vibe_check.py --full          # + your lint, types a
 python3 skills/ship/scripts/vibe_check.py --install-hook  # run on every commit
 ```
 
-Add your own commands (formatters, gitleaks, `iac-check`, anything) one per line in `.overmind/checks`; each one fails the gate on a non-zero exit. The CI workflow in `.github/workflows/ci.yml` runs it on every pull request.
+Add your own commands (formatters, gitleaks, `iac-check`, anything) one per line in `.overmind/checks`; each fails the gate on a non-zero exit. Those are shell commands from the repo, so read the file before running the gate somewhere you don't control. The CI workflow in `.github/workflows/ci.yml` runs it on every pull request.
 
 ## Scripts at a glance
 
@@ -146,11 +146,11 @@ python3 packs/k8s/skills/drift/scripts/drift_check.py --history
 python3 skills/deps-check/scripts/deps_check.py
 ```
 
-All scripts are read-only, need only Python 3 (plus PyYAML for `crd-check`), and print compact summaries.
+Most of these only read. The ones that write say so: `ratchet` keeps state in `.overmind/` and checkpoints under `refs/overmind/`, `team` creates worktrees and applies patches, `loop.py mutate` edits changed files and restores them, `service_map.py --okf` writes `docs/okf`, and `vibe_check.py --install-hook` writes a commit hook. `drift_check.py` never writes to your cluster, only a local history file. All need just Python 3 (plus PyYAML for `crd-check`) and print compact summaries.
 
 ## Token budget
 
-Only skill names and descriptions sit in context until a skill is used. The 14 core descriptions together are about 870 tokens (version 0.5's 41 were about 1,900); the four packs add about 620 more. Opening a skill loads its short table (200 to 460 tokens) and then one reference file. `python3 tools/lint_skills.py` reports the current numbers.
+Only skill names and descriptions sit in context until a skill is used. The 14 core descriptions total about 910 tokens (version 0.5's 41 were about 1,900); the four packs add about 620 more. Opening a skill loads its short table (200 to 460 tokens) and then one reference file. `python3 tools/lint_skills.py` reports the current numbers.
 
 ## Roadmap
 
