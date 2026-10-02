@@ -1,99 +1,249 @@
 # overmind
 
-**The mind above your agents. Ship like a senior team.** · v0.7
+**The mind above your agents.** · v0.7
 
-overmind is a lean set of skills that gives your coding agent senior-engineer habits: design before code, test first, debug from evidence, review before merge, and prove it works before saying it's done. It ships 14 core skills that cover the whole job for a small team, plus optional packs for regulated finance and healthcare work, Postgres, MongoDB, Snowflake and Databricks, Kubernetes, and API and agent design.
+overmind is an engineering methodology for coding agents, delivered as a library of composable skills. It gives an agent the habits a senior team takes for granted: establish a design before writing code, drive implementation with tests, debug from evidence rather than guesswork, review a change before merging it, and prove work is finished before claiming it is.
 
-Small scripts do the heavy lifting, not the model. Logs, manifests and IaC are scanned locally, so the agent reads a 20-line summary instead of thousands of lines. That keeps token use low.
+Fourteen core skills cover the full delivery cycle. Four optional packs add depth for regulated domains, data platforms, Kubernetes, and API and agent design.
 
-It works with any agent that supports the open [Agent Skills](https://agentskills.io) format: Claude Code, Codex, Kiro, Cursor, GitHub Copilot, Gemini CLI and more.
+## Table of Contents
 
-## Install
+- [How it works](#how-it-works)
+- [Requirements](#requirements)
+- [Installation](#installation)
+  - [Claude Code](#claude-code)
+  - [Codex, Kiro and Qwen Code](#codex-kiro-and-qwen-code)
+  - [Cursor](#cursor)
+  - [Other agents](#other-agents)
+  - [Agent support matrix](#agent-support-matrix)
+- [The workflow](#the-workflow)
+- [What's inside](#whats-inside)
+  - [Core skills](#core-skills)
+  - [Packs](#packs)
+  - [Scripts](#scripts)
+- [The ship gate](#the-ship-gate)
+- [Token budget](#token-budget)
+- [Upgrading from 0.5](#upgrading-from-05)
+- [Contributing](#contributing)
+- [Support](#support)
+- [Roadmap](#roadmap)
+- [Scope and limitations](#scope-and-limitations)
+- [License](#license)
 
-**Any agent, one command** (auto-detects your agent):
+## How it works
+
+Skills activate from the request itself. When you ask for a feature, `design` turns a vague ask into an agreed design and then into small tasks with named files and explicit checks. When you ask for a fix, `debug` reaches for evidence before it reaches for a patch. The `boot` skill routes anything that does not match a skill directly, so there is no command to remember and no mode to enter.
+
+Deterministic work belongs in code, not in the model. Logs, manifests, infrastructure definitions and dependency trees are parsed by small Python scripts that emit a compact summary, and the agent reads that summary instead of thousands of raw lines. The result is lower token use and answers that do not drift between runs.
+
+The process is built to resist the two failure modes that cost the most. Work that takes several attempts runs under `ratchet`, which anchors the goal, freezes the tests that already pass, measures each iteration against a floor that only rises, and reverts any step that regresses. Work split across parallel agents runs under `delegate`, which is contract-first: the lead defines the shared contract, each worker owns a disjoint set of files in its own worktree, and results are verified against each worker's own test verdict rather than accepted on the worker's word.
+
+Nothing is reported as complete without evidence. The `ship` skill requires command output from the current session before a claim of done, fixed or passing, and its gate blocks secrets, regulated identifiers and debugging leftovers before a commit lands.
+
+## Requirements
+
+- An agent that supports the open [Agent Skills](https://agentskills.io) format and can run shell commands
+- Python 3 and git
+- PyYAML, for the `crd-check` skill in the `k8s` pack only
+
+## Installation
+
+Install overmind separately for each agent you use. Core skills always install; packs are opt-in.
+
+### Claude Code
+
+As a plugin, from the marketplace in this repository:
+
+```text
+/plugin marketplace add Srimukh99/overmind
+/plugin install overmind@overmind
+```
+
+Packs are published as separate plugins:
+
+```text
+/plugin install overmind-regulated@overmind
+/plugin install overmind-data@overmind
+/plugin install overmind-k8s@overmind
+/plugin install overmind-apis-agents@overmind
+```
+
+### Codex, Kiro and Qwen Code
+
+Clone the repository and run the installer from the project you want to equip:
+
+```bash
+git clone https://github.com/Srimukh99/overmind
+cd your-project
+
+/path/to/overmind/install.sh --agent all                        # this project
+/path/to/overmind/install.sh --agent all --scope user           # every project
+/path/to/overmind/install.sh --agent all --pack regulated,data  # with packs
+```
+
+`--agent all` installs for Claude Code, Codex, Kimi Code, Kiro and Qwen Code. Full options:
+
+| Flag | Values |
+| --- | --- |
+| `--agent` | `claude`, `codex`, `kiro`, `qwen`, `cursor`, `all` |
+| `--scope` | `project` (default), `user` |
+| `--pack` | `regulated`, `data`, `k8s`, `apis-agents`, `all` |
+| `--target` | directory to install into (default: current) |
+
+### Cursor
+
+Install with `--agent cursor` alone. Cursor reads `.cursor/skills/`, `.claude/skills/` and `.agents/skills/`, so installing for several agents at once would list every skill more than once.
+
+```bash
+/path/to/overmind/install.sh --agent cursor
+```
+
+### Other agents
+
+One command, which detects the agent and installs everything it finds, packs included:
 
 ```bash
 npx skills add Srimukh99/overmind
 ```
 
-**From a clone** (Claude Code, Codex, Kiro):
+### Agent support matrix
 
-```bash
-git clone https://github.com/Srimukh99/overmind
-cd your-project
-/path/to/overmind/install.sh --agent all            # this project only
-/path/to/overmind/install.sh --agent all --scope user   # every project
-/path/to/overmind/install.sh --agent all --pack regulated,data   # add packs (or --pack all)
-```
-
-Core skills always install. Packs are opt-in — `regulated`, `data`, `k8s`, `apis-agents` — but `npx skills add` takes everything it finds, packs included.
-
-**Claude Code plugin**:
-
-```text
-/plugin marketplace add Srimukh99/overmind
-/plugin install overmind@overmind
-/plugin install overmind-regulated@overmind     # optional packs: overmind-data, overmind-k8s, overmind-apis-agents
-```
-
-Then work as usual. The agent picks skills by matching your request to their descriptions, and `boot` routes whatever is left.
-
-## Works with
-
-The agent app loads skills, not the model, so any model works inside an app that supports the open Agent Skills format.
-
-| Agent | Install | Folder it reads |
+| Agent | Install | Skills directory |
 | --- | --- | --- |
 | Claude Code | `--agent claude` | `.claude/skills/` |
 | Codex, Kimi Code | `--agent codex` | `.agents/skills/` |
 | Kiro | `--agent kiro` | `.kiro/skills/` |
 | Qwen Code | `--agent qwen` | `.qwen/skills/` |
-| Cursor | `--agent cursor` | `.cursor/skills/` (also reads `.claude/skills/` and `.agents/skills/`) |
-| Gemini CLI, GitHub Copilot, OpenCode, Roo Code, Goose and others | `npx skills add Srimukh99/overmind` | each agent's own folder |
+| Cursor | `--agent cursor` | `.cursor/skills/` (also reads `.claude/skills/`, `.agents/skills/`) |
+| Gemini CLI, GitHub Copilot, OpenCode, Roo Code, Goose and others | `npx skills add Srimukh99/overmind` | the agent's own directory |
 
-`--agent all` covers Claude Code, Codex, Kimi Code, Kiro and Qwen Code. Install Cursor with `--agent cursor` alone: it reads several of these folders and would otherwise list every skill twice. The scripts need an agent that can run shell commands, plus Python 3 and git.
+Skills are loaded by the agent application rather than the model, so any model works inside an application that supports the format.
 
-## The flow
+## The workflow
 
 ```text
 design → build (ratchet, delegate) → review → ship
 something breaks: debug (logs → source line → cause → fix)        outage: firefight
 ```
 
-## Core skills (14)
+1. **design** — Activates on a feature or behaviour change with nothing specced. Turns the ask into an agreed design, then into tasks small enough to verify, each with exact files and checks.
 
-Each skill opens with a short table of situations pointing to one reference file, so the agent reads only what the moment needs.
+2. **build** — Activates once a plan exists. Creates an isolated worktree, runs a test-first loop built for agent speed, and escalates checks in tiers: typecheck and lint on every edit, related tests when those pass, the full suite before done.
 
-| Skill | Use it for |
-| --- | --- |
-| `boot` | Routing every task to the right skill |
-| `design` | A fuzzy ask into an approved design, then small verifiable tasks with exact files and checks |
-| `build` | Isolated worktree, test-first loop built for agents, tiered checks, mutation testing, a guard that catches skipped or weakened tests, plan execution |
-| `ratchet` | Every iteration must improve the code without breaking what works or drifting from the goal: anchors the goal, freezes existing tests, checks each step against a rising floor, reverts bad steps |
-| `delegate` | Contract-first delegation: you write the shared contract, each worker owns its own files and works in its own worktree under `ratchet`, results are verified rather than trusted, and work lands in waves |
-| `debug` | Paste a log to get the error and its source line, or name a service: it finds the runtime, cloud and log shipper, then queries the right backend (9 clouds, 7 aggregators, never kubectl). From there, evidence-based debugging and tracing bad data to its origin. Exports the service map as an Open Knowledge Format bundle any agent can read |
-| `review` | Independent review ranked by severity, security review of risky changes, handling feedback on its merits |
-| `ship` | The quality and compliance gate, before commit and in CI; proof before "done"; a release checklist with a rollback plan; gradual rollout; clean merge or PR |
-| `legal-traps` | For vibe coders and new PMs: COPPA, HIPAA pixels, wiretap claims, Google Fonts in the EU, unsubscribe and postal address, hidden fees, auto-renew consent, DMCA agent |
-| `iac-check` | Public databases, open security groups, public buckets, wildcard IAM, privileged pods, secrets in images |
-| `deps-check` | Vulnerable dependencies across Python, Node, Go, Rust and images |
-| `observe` | Logs, RED metrics, traces, health checks, alerts, SLIs, SLOs, error budgets, runbooks |
-| `firefight` | Incident triage, mitigation and blameless postmortems |
-| `forge` | Writing new skills that actually help |
+3. **ratchet** — Activates when work takes several attempts. Anchors the goal and scope, freezes passing tests as a floor, and accepts an iteration only if it raises that floor. Rejected steps revert to the last accepted checkpoint.
 
-## Packs (install what you need)
+4. **delegate** — Activates when a plan has independent tasks. The lead writes the shared contract and assigns each worker files no other worker may touch; overlapping ownership is rejected before any work starts. Verified workers land in waves.
 
-| Pack | Skills | Use it for |
+5. **review** — Activates when a change is ready. Reviews the diff independently, ranks findings by severity, and treats incoming feedback on its merits rather than implementing it on sight.
+
+6. **ship** — Activates before any commit, merge or deploy. Runs the gate, requires command output as proof of every claim, checks a release is reversible, and finishes the branch.
+
+Skills are checked before the task begins, not offered afterwards.
+
+## What's inside
+
+### Core skills
+
+**Routing**
+- **boot** — Routes every task to the right skill before exploration begins
+
+**Design and implementation**
+- **design** — A fuzzy ask into an approved design, then small verifiable tasks
+- **build** — Isolated worktree, test-first loop, tiered checks, mutation testing, and a guard that catches skipped or weakened tests
+- **ratchet** — Iterations that must improve the code without breaking what works or drifting from the goal
+- **delegate** — Contract-first parallel work with disjoint file ownership and verified, not trusted, results
+
+**Diagnosis**
+- **debug** — A log in, the error and its source line out; or a service name in, and it identifies the runtime, cloud and log shipper and queries the right backend across 9 clouds and 7 aggregators, never `kubectl`. Exports the service map as an Open Knowledge Format bundle
+- **firefight** — Incident triage, mitigation and blameless postmortems
+
+**Review and release**
+- **review** — Independent severity-ranked review, plus security review of risky changes
+- **ship** — The quality and compliance gate, proof before "done", a release checklist with a rollback plan, gradual rollout, and clean merge or PR
+
+**Risk and compliance**
+- **legal-traps** — COPPA, HIPAA pixels, wiretap claims, EU font loading, unsubscribe and postal address, hidden fees, auto-renew consent, DMCA agent
+- **iac-check** — Public databases, open security groups, public buckets, wildcard IAM, privileged pods, secrets in images
+- **deps-check** — Vulnerable dependencies across Python, Node, Go, Rust and container images
+
+**Operations**
+- **observe** — Logs, RED metrics, traces, health checks, alerts, SLIs, SLOs, error budgets and runbooks
+
+**Meta**
+- **forge** — Creating and editing skills, with a standard for proving one changes behaviour
+
+Each skill opens with a short table of situations pointing to a single reference file, so the agent reads only what the moment requires.
+
+### Packs
+
+| Pack | Skills | Domain |
 | --- | --- | --- |
-| `regulated` | `reg-phi` `reg-pci` `reg-money` `reg-audit` | Health data and HIPAA, PCI DSS card data, money math and ledgers, audit trails and SOX or SOC 2 change control |
+| `regulated` | `reg-phi` `reg-pci` `reg-money` `reg-audit` | Health data and HIPAA, PCI DSS card data, money arithmetic and ledgers, audit trails for SOX and SOC 2 change control |
 | `data` | `pg-explain` `pg-migrate` `mongo-index` `snow-perf` `dbx-perf` | Slow Postgres queries, zero-downtime schema changes, MongoDB indexes, Snowflake cost, Spark tuning |
-| `k8s` | `k8s-triage` `drift` `crd-check` | CrashLoopBackOff and stuck rollouts, git versus live state, CRD validation and cluster upgrades |
-| `apis-agents` | `api-pick` `agent-tools` | REST vs GraphQL vs gRPC, tools and MCP servers agents use well |
+| `k8s` | `k8s-triage` `drift` `crd-check` | CrashLoopBackOff and stuck rollouts, git versus live state, CRD validation across cluster upgrades |
+| `apis-agents` | `api-pick` `agent-tools` | REST against GraphQL against gRPC, and tool design agents use well |
+
+### Scripts
+
+Sixteen scripts carry the deterministic work. Fourteen run standalone and print a compact summary; `mutate.py` and `backends.py` are imported by `loop.py` and `log_fetch.py` respectively. The commands you invoke directly:
+
+```bash
+kubectl logs pod/api-7d9f --previous | python3 skills/debug/scripts/log_trace.py --repo .
+python3 skills/debug/scripts/service_map.py .            # map services, clouds and shippers
+python3 skills/debug/scripts/service_map.py . --okf      # export that map as an OKF bundle in docs/okf
+python3 skills/debug/scripts/log_fetch.py notification-service --since 2h
+python3 skills/legal-traps/scripts/legal_traps.py .
+python3 skills/build/scripts/loop.py fast                # then focused, then full
+python3 skills/build/scripts/loop.py mutate              # inject bugs; report the ones no test catches
+python3 skills/build/scripts/tamper.py                   # catch skipped, deleted or weakened tests
+python3 skills/ratchet/scripts/ratchet.py start --goal "..." --scope 'src/x/**' --target tests/test_x.py::test_y
+python3 skills/ratchet/scripts/ratchet.py check          # ACCEPT / REJECT / STALL / DONE
+python3 skills/delegate/scripts/team.py init --goal "..." --contract tests/contract
+python3 skills/delegate/scripts/team.py verify           # each worker's claim against its ratchet verdict
+python3 skills/delegate/scripts/team.py integrate --apply
+python3 skills/iac-check/scripts/iac_check.py infra/ deploy/
+python3 skills/deps-check/scripts/deps_check.py
+python3 packs/k8s/skills/crd-check/scripts/crd_check.py deploy/ --target 1.30
+python3 packs/k8s/skills/drift/scripts/drift_check.py --k8s-dir deploy/ -n prod
+```
+
+Most of these only read. The ones that write say so: `ratchet` keeps state in `.overmind/` and checkpoints under `refs/overmind/`, `team` creates worktrees and applies patches, `loop.py mutate` edits changed files and restores them, `service_map.py --okf` writes `docs/okf`, and `vibe_check.py --install-hook` writes a commit hook. `drift_check.py` never writes to a cluster, only to a local history file.
+
+## The ship gate
+
+`vibe-check`, in the `ship` skill, blocks cloud keys and private keys, card numbers, US SSN patterns, committed `.env` files, debugger statements, focused tests and merge conflict markers. It has no dependencies beyond Python 3.
+
+```bash
+python3 skills/ship/scripts/vibe_check.py                  # staged changes in the current repo
+python3 skills/ship/scripts/vibe_check.py --repo ../myapp  # or another repo
+python3 skills/ship/scripts/vibe_check.py --range origin/main...HEAD
+python3 skills/ship/scripts/vibe_check.py --full           # and the project's lint, types and tests
+python3 skills/ship/scripts/vibe_check.py --install-hook   # run on every commit
+```
+
+| Finding | Level |
+| --- | --- |
+| Cloud keys, private keys, provider tokens (AWS, GitHub, Slack, Stripe, Google, OpenAI, Anthropic) | FAIL |
+| `.env`, `.pem`, `.p12`, `id_rsa` and similar files committed | FAIL |
+| Luhn-valid card numbers, excluding published processor test cards | FAIL |
+| US SSN patterns | FAIL |
+| Debugger statements and focused tests | FAIL |
+| Merge conflict markers | FAIL |
+| Hard-coded secret-looking assignments | WARN |
+| Files over 5 MB | WARN |
+
+A deliberate false positive can carry `vibe-check: ignore` on the line, used sparingly and explained in the pull request.
+
+Project-specific commands go one per line in `.overmind/checks`, and each fails the gate on a non-zero exit. Those are shell commands read from the repository, so review that file before running the gate somewhere you do not control. The workflow in `.github/workflows/ci.yml` runs skill lint, the layout check, the unit suite and the gate on every push and pull request.
+
+## Token budget
+
+Only skill names and descriptions occupy context until a skill is used. The 14 core descriptions total roughly 910 tokens; the four packs add roughly 620 more. Opening a skill loads its table, between 200 and 460 tokens, and then one reference file. Run `python3 tools/lint_skills.py` for the current figures.
 
 ## Upgrading from 0.5
 
 <!-- upgrade:start -->
-Version 0.5 had 41 skills. Nothing was deleted: the instructions moved into `references/` files and every script is unchanged. Old names map like this.
+Version 0.5 had 41 skills. Nothing was removed: instructions moved into `references/` files and every script is unchanged. Old names map as follows.
 
 | 0.5 name | Now |
 | --- | --- |
@@ -106,67 +256,35 @@ Version 0.5 had 41 skills. Nothing was deleted: the instructions moved into `ref
 | `reg-*`, `pg-*`, `mongo-index`, `snow-perf`, `dbx-perf`, `k8s-triage`, `drift`, `crd-check`, `api-pick`, `agent-tools` | the matching pack, same names |
 | the rest | unchanged |
 
-Script paths changed with their skills, for example `skills/prove-it/scripts/loop.py` is now `skills/build/scripts/loop.py`.
+Script paths moved with their skills: `skills/prove-it/scripts/loop.py` is now `skills/build/scripts/loop.py`.
 <!-- upgrade:end -->
 
-## The ship gate
+## Contributing
 
-`vibe-check` (in the `ship` skill) blocks secrets, private keys, card numbers, SSNs, committed `.env` files, debugger leftovers, focused tests and conflict markers. No dependencies, just Python 3.
+1. Read `skills/forge/SKILL.md`, which defines the format and the standard for proving a skill helps.
+2. One skill per pull request, with the three should-trigger and two should-not prompts you tested in the description.
+3. CI must pass: skill lint, layout check, unit tests and the gate.
+4. Core stays at 14 skills or fewer. A new specialist skill belongs in a pack under `packs/NAME/skills/`; a new job inside an existing skill belongs in its `references/` directory.
+5. Original wording only, in skills and in references.
+6. Regulated-domain skills need a source for every rule and must stay labelled as engineering guidance rather than legal advice.
 
-```bash
-python3 skills/ship/scripts/vibe_check.py                 # staged changes in the current repo
-python3 skills/ship/scripts/vibe_check.py --repo ../myapp  # ... or another repo
-python3 skills/ship/scripts/vibe_check.py --range origin/main...HEAD
-python3 skills/ship/scripts/vibe_check.py --full          # + your lint, types and tests
-python3 skills/ship/scripts/vibe_check.py --install-hook  # run on every commit
-```
+See `CONTRIBUTING.md` for the full process.
 
-Add your own commands (formatters, gitleaks, `iac-check`, anything) one per line in `.overmind/checks`; each fails the gate on a non-zero exit. Those are shell commands from the repo, so read the file before running the gate somewhere you don't control. The CI workflow in `.github/workflows/ci.yml` runs it on every pull request.
+## Support
 
-## Scripts at a glance
-
-```bash
-kubectl logs pod/api-7d9f --previous | python3 skills/debug/scripts/log_trace.py --repo .
-python3 skills/debug/scripts/service_map.py .            # once: map services, clouds, shippers
-python3 skills/debug/scripts/service_map.py . --okf      # also export the map as an Open Knowledge Format bundle in docs/okf
-python3 skills/debug/scripts/log_fetch.py notification-service --since 2h
-python3 skills/legal-traps/scripts/legal_traps.py .            # consumer-app legal traps
-python3 skills/build/scripts/loop.py fast                   # typecheck+lint; then focused, then full
-python3 skills/build/scripts/tamper.py                      # catch skipped, deleted or weakened tests
-python3 skills/build/scripts/loop.py mutate                 # inject bugs into changed code; report the ones no test catches
-python3 skills/ratchet/scripts/ratchet.py start --goal "..." --scope 'src/x/**' --target tests/test_x.py::test_y
-python3 skills/ratchet/scripts/ratchet.py check                # ACCEPT / REJECT / STALL / DONE; revert on reject
-python3 skills/delegate/scripts/team.py init --goal "..." --contract tests/contract   # then add, check, spawn, brief
-python3 skills/delegate/scripts/team.py verify                 # each worker's claim vs its ratchet verdict
-python3 skills/delegate/scripts/team.py integrate --apply      # merge verified workers, run the suite once, land it
-python3 skills/iac-check/scripts/iac_check.py infra/ deploy/
-python3 packs/k8s/skills/crd-check/scripts/crd_check.py deploy/ --target 1.30     # needs PyYAML
-python3 packs/k8s/skills/drift/scripts/drift_check.py --k8s-dir deploy/ -n prod   # read-only
-python3 packs/k8s/skills/drift/scripts/drift_check.py --history
-python3 skills/deps-check/scripts/deps_check.py
-```
-
-Most of these only read. The ones that write say so: `ratchet` keeps state in `.overmind/` and checkpoints under `refs/overmind/`, `team` creates worktrees and applies patches, `loop.py mutate` edits changed files and restores them, `service_map.py --okf` writes `docs/okf`, and `vibe_check.py --install-hook` writes a commit hook. `drift_check.py` never writes to your cluster, only a local history file. All need just Python 3 (plus PyYAML for `crd-check`) and print compact summaries.
-
-## Token budget
-
-Only skill names and descriptions sit in context until a skill is used. The 14 core descriptions total about 910 tokens (version 0.5's 41 were about 1,900); the four packs add about 620 more. Opening a skill loads its short table (200 to 460 tokens) and then one reference file. `python3 tools/lint_skills.py` reports the current numbers.
+Questions, defects and feature requests belong in [GitHub Issues](https://github.com/Srimukh99/overmind/issues).
 
 ## Roadmap
 
-- `idx`: a local repo index so agents look up symbols instead of reading whole files.
-- A context-compression harness for tool output.
-- More packs: deeper Snowflake, MongoDB, Postgres and agentic skills.
-- An eval arena that proves each skill beats no skill.
+- `idx` — a local repository index so agents look up symbols instead of reading whole files
+- A context-compression harness for tool output
+- Deeper Snowflake, MongoDB, Postgres and agent-design packs
+- An evaluation arena that demonstrates each skill outperforms no skill
 
-## Important
+## Scope and limitations
 
-The `reg-*` skills are engineering guardrails, not legal or compliance advice. Your compliance, privacy and security teams set policy. `vibe-check`, `iac-check` and the other scripts reduce risk; they don't guarantee a system is secure or compliant.
-
-## Credits
-
-Inspired by the skills-as-workflow idea popularized by [obra/superpowers](https://github.com/obra/superpowers). All overmind skill names and text are original.
+The `reg-*` skills are engineering guardrails, not legal or compliance advice. Your compliance, privacy and security teams set policy. `vibe-check`, `iac-check` and the other scripts reduce risk; they do not guarantee that a system is secure or compliant.
 
 ## License
 
-MIT
+MIT. See `LICENSE`.
