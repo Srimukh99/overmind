@@ -1,6 +1,6 @@
 ---
 name: boot
-description: Use when starting any coding session or task in a repo. Routes the work to the right overmind skill before you explore, ask questions, or write code.
+description: Use when starting any coding session or task in a repo. Routes the work to the right overmind skill before you explore, ask questions or begin.
 ---
 
 # boot

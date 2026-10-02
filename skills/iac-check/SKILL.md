@@ -1,6 +1,6 @@
 ---
 name: iac-check
-description: Use when writing or reviewing Terraform, CloudFormation, Kubernetes manifests, Helm output or Dockerfiles, or when asked if infrastructure is secure. Calls out risky design such as public databases, open security groups, public buckets, wildcard IAM and privileged pods.
+description: Use when writing or reviewing Terraform, CloudFormation, Kubernetes manifests, Helm output or Dockerfiles, or when asked if infrastructure is secure.
 ---
 
 # iac-check

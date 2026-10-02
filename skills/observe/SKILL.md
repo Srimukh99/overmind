@@ -1,6 +1,6 @@
 ---
 name: observe
-description: Use when adding a service, endpoint, job or queue consumer with no way to tell if it is healthy, or when defining reliability targets, SLIs, SLOs, error budgets, alerts or runbooks. Adds the logs, metrics, traces and alerts needed to run it.
+description: Use when adding a service, endpoint, job or queue consumer with no way to tell if it is healthy, or when defining SLIs, SLOs, error budgets, alerts or runbooks.
 ---
 
 # observe

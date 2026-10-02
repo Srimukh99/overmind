@@ -1,6 +1,6 @@
 ---
 name: delegate
-description: Use when a plan has independent tasks, several unrelated failures to fix, or work big enough to split across subagents. Writes the shared contract first, hands each subagent a tight brief with its own files, worktree and ratchet, then reviews and verifies every result instead of trusting it, and integrates in waves.
+description: Use when a plan has independent tasks, several unrelated failures to fix, or work big enough to split across subagents.
 ---
 
 # delegate

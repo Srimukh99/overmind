@@ -1,6 +1,6 @@
 ---
 name: ratchet
-description: Use when iterating on code over several attempts - a feature, a fix that keeps failing, an agent loop - so every accepted step improves it without regressions, breakage or scope creep. Anchors the goal, freezes existing tests, checks each iteration against a rising floor and reverts bad steps.
+description: Use when iterating on code over several attempts - a feature, a fix that keeps failing, an agent loop - so every accepted step improves it without regressions or scope creep.
 ---
 
 # ratchet

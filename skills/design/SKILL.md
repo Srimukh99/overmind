@@ -1,6 +1,6 @@
 ---
 name: design
-description: Use when asked to build a feature or change behaviour and nothing is specced yet, or when an approved design needs breaking into small tasks with exact files, tests and proof commands. Turns a fuzzy ask into a short design the user approves, then into a plan.
+description: Use when asked to build a feature or change behaviour and nothing is specced yet, or when an approved design needs breaking into small tasks with exact files, tests and proof commands. Works out what to build before any code.
 ---
 
 # design

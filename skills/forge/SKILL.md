@@ -1,6 +1,6 @@
 ---
 name: forge
-description: Use when creating a new overmind skill or editing an existing one. Keeps skills lean, portable across every coding agent, and proven to change behaviour.
+description: Use when creating a new overmind skill or editing an existing one.
 ---
 
 # forge

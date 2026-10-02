@@ -1,6 +1,6 @@
 ---
 name: legal-traps
-description: Use when building or shipping a consumer app - signup, checkout, subscriptions, email, SMS, uploads, analytics or tracking scripts - to catch the legal mistakes new builders make (COPPA, HIPAA, wiretap claims, CAN-SPAM, auto-renewal, drip pricing, DMCA, remote fonts) and apply the fix.
+description: Use when building or shipping a consumer app - signup, checkout, subscriptions, email, SMS, uploads, analytics or tracking scripts - to catch the legal traps new builders miss (COPPA, HIPAA, wiretap claims, CAN-SPAM, auto-renewal, drip pricing, DMCA, remote fonts).
 ---
 
 # legal-traps

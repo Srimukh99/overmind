@@ -1,6 +1,6 @@
 ---
 name: build
-description: Use when writing or changing code (features, bug fixes, refactors), starting feature work without disturbing the current checkout, or executing an approved plan task by task with check-ins after each batch. Isolated worktree, test-first loop with tiered checks, mutation testing, and a guard against skipped or weakened tests.
+description: Use when writing or changing code - features, bug fixes, refactors - starting feature work in a fresh isolated worktree with a clean baseline, or executing an approved plan task by task with check-ins after each batch. Test-first loop, tiered checks, and a guard against skipped or weakened tests.
 ---
 
 # build

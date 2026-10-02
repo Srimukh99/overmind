@@ -238,7 +238,7 @@ Project-specific commands go one per line in `.overmind/checks`, and each fails 
 
 ## Token budget
 
-Only skill names and descriptions occupy context until a skill is used. The 14 core descriptions total roughly 910 tokens; the four packs add roughly 620 more. Opening a skill loads its table, between 200 and 460 tokens, and then one reference file. Run `python3 tools/lint_skills.py` for the current figures.
+Only skill names and descriptions occupy context until a skill is used. The 14 core descriptions total roughly 680 tokens; the four packs add roughly 620 more. Opening a skill loads its table, between 200 and 460 tokens, and then one reference file, so a working session reads far less than a library that keeps its guidance in prose. Run `python3 tools/lint_skills.py` for the current figures and `python3 evals/routing.py` to check that description edits have not cost any routing accuracy.
 
 ## Upgrading from 0.5
 

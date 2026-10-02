@@ -1,6 +1,6 @@
 ---
 name: review
-description: Use when a task or feature is finished and needs an independent review of the diff before merging, when review comments arrive and need judging on merit, or when code touches login, sessions, permissions, secrets, uploads, webhooks or personal data and needs a security review.
+description: Use when a finished task needs an independent review of the diff before merging, when review comments arrive and need judging on merit, or when code touches login, sessions, permissions, secrets, uploads, webhooks or personal data.
 ---
 
 # review

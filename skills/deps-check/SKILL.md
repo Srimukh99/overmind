@@ -1,6 +1,6 @@
 ---
 name: deps-check
-description: Use when adding or upgrading dependencies, before a release, or when asked about vulnerable packages, CVEs, or supply-chain risk in Python, Node, Go, Rust or container images.
+description: Use when adding or upgrading dependencies, before a release, or when asked about vulnerable packages, CVEs or supply-chain risk in Python, Node, Go, Rust or container images.
 ---
 
 # deps-check

@@ -1,6 +1,6 @@
 ---
 name: firefight
-description: Use when production is down or degraded, an alert fires, users report an outage, or after an incident when a postmortem is needed. Runs the incident from triage to mitigation to blameless postmortem.
+description: Use when production is down or degraded, an alert fires, users report an outage, or an incident needs a postmortem.
 ---
 
 # firefight

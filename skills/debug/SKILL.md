@@ -1,6 +1,6 @@
 ---
 name: debug
-description: Use when there is a bug, failing test, crash, flaky behaviour or wrong output, an unexpected null or bad data far from its origin, a failing service that needs its logs, or a pasted log or stack trace. Fetches logs from the right backend (CloudWatch, Cloud Logging, Loki and others), finds the source line, and traces the cause before any fix.
+description: Use when there is a bug, failing test, crash, flaky behaviour or wrong output, an unexpected null or bad data far from its origin, a failing service that needs its logs, or a pasted log or stack trace. Fetches logs (CloudWatch, Cloud Logging, Loki), points to the source line, and finds the cause before any fix.
 ---
 
 # debug
