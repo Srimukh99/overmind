@@ -30,3 +30,27 @@ jobs:
           else
             python3 skills/ship/scripts/vibe_check.py --range "$BASE...HEAD"
           fi
+
+  evals:
+    # The evals are reporting tools, not gates: this job proves the harness still
+    # runs and prints its numbers, so the figures quoted in README.md and
+    # evals/README.md cannot silently rot. The numeric guard for routing lives in
+    # tests/test_routing.py, which the check job runs.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install eval dependencies
+        run: pip install pytest hypothesis
+      - name: Routing
+        run: python3 evals/routing.py
+      - name: Tamper guard
+        run: python3 evals/tamper_guard.py
+      - name: ratchet vs naive gate
+        run: python3 evals/ratchet_vs_naive.py
+      - name: Delegation
+        run: python3 evals/delegation.py
+      - name: Mutation - weak suite vs strong suite
+        run: sh evals/mutation/run.sh

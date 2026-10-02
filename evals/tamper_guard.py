@@ -1,6 +1,9 @@
 """Tamper guard: cheating diffs vs honest test changes. Run: python3 evals/tamper_guard.py"""
 import os, subprocess, shutil, json, sys
-import os, tempfile
+import tempfile
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _eval_git as EG  # noqa: E402
+
 OVERMIND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORK = tempfile.mkdtemp(prefix='overmind-eval-')
 TAMPER = os.path.join(OVERMIND, 'skills', 'build', 'scripts', 'tamper.py')
@@ -85,7 +88,7 @@ HONEST = {
  'go: add subtest':           (G, GO + '\nfunc TestParseHours(t *testing.T) {\n\tif got, _ := Parse("1h"); got != 3600 {\n\t\tt.Errorf("got %d", got)\n\t}\n}\n'),
 }
 
-def git(*a, cwd): subprocess.run(['git', '-c', 'user.email=a@b', '-c', 'user.name=a'] + list(a), cwd=cwd, check=True, capture_output=True)
+def git(*a, cwd): EG.git(EG.IDENT + list(a), cwd=cwd)
 
 def scenario(path, text, move=None):
     d = os.path.join(WORK, 'repo'); shutil.rmtree(d, ignore_errors=True)

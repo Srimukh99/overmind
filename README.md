@@ -17,6 +17,7 @@ Fourteen core skills cover the full delivery cycle. Four optional packs add dept
   - [Other agents](#other-agents)
   - [Agent support matrix](#agent-support-matrix)
 - [The workflow](#the-workflow)
+- [Evidence](#evidence)
 - [What's inside](#whats-inside)
   - [Core skills](#core-skills)
   - [Packs](#packs)
@@ -139,6 +140,38 @@ something breaks: debug (logs → source line → cause → fix)        outage: 
 6. **ship** — Activates before any commit, merge or deploy. Runs the gate, requires command output as proof of every claim, checks a release is reversible, and finishes the branch.
 
 Skills are checked before the task begins, not offered afterwards.
+
+## Evidence
+
+Each mechanism is measured against the naive alternative, with scripted
+adversaries rather than prose argument. Every figure below is reproducible on
+your own machine; `evals/README.md` has the full method and caveats.
+
+| Mechanism | overmind | The naive alternative |
+| --- | --- | --- |
+| **Contract-first delegation** (`delegate`) | **8 of 8** contract tests passing, **0** bad changes reached main | trust each worker's claim: 2 of 8 passing, **4** bad changes landed |
+| **Rising-floor iteration** (`ratchet`) | **7 of 7** iterations judged correctly | "the failing count did not rise" gate: 2 of 7 |
+| **Test-tampering guard** (`build`) | **19 of 19** cheats flagged, **0 of 12** honest changes wrongly failed | nothing stops a skipped or weakened test |
+| **Mutation testing** (`build`) | strong suite kills **33 of 33** injected bugs | a green suite that kills **8 of 33** — and still reports all tests passing |
+| **Skill routing** (`boot`) | **98%** top-1, **100%** top-3, every legacy trigger preserved | 3.6% by chance across 28 skills |
+
+```bash
+python3 evals/delegation.py          # needs pytest
+python3 evals/ratchet_vs_naive.py    # needs pytest
+python3 evals/tamper_guard.py
+sh evals/mutation/run.sh             # needs pytest + hypothesis
+python3 evals/routing.py
+```
+
+The mutation row is the one worth dwelling on: both suites pass. A green
+test run tells you nothing about whether the tests check anything, and the
+difference between those two suites is 24% against 100%.
+
+**What these evals do not show.** The adversaries are scripted, not real
+agents, so these measure whether the tooling catches known mistakes, not
+whether an agent using overmind produces better code than one without it.
+That comparison needs a model API key and is not built; `evals/README.md`
+says so plainly, and it is on the roadmap rather than claimed here.
 
 ## What's inside
 
@@ -279,7 +312,7 @@ Questions, defects and feature requests belong in [GitHub Issues](https://github
 - `idx` — a local repository index so agents look up symbols instead of reading whole files
 - A context-compression harness for tool output
 - Deeper Snowflake, MongoDB, Postgres and agent-design packs
-- An evaluation arena that demonstrates each skill outperforms no skill
+- Real agents on real tasks, measured with and without overmind, to go beyond the scripted evals below
 
 ## Scope and limitations
 

@@ -19,6 +19,9 @@ Run: python3 evals/delegation.py   (needs pytest)
 """
 import json, os, re, shutil, subprocess, sys, tempfile, time
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _eval_git as EG  # noqa: E402
+
 OVERMIND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TEAM = os.path.join(OVERMIND, 'skills', 'delegate', 'scripts', 'team.py')
 sys.path.insert(0, os.path.join(OVERMIND, 'skills', 'ratchet', 'scripts'))
@@ -152,7 +155,7 @@ def team(root, *args):
 def run_team(log):
     main = fresh('team')
     for c in (['init', '-q'], ['add', '-A'], ['commit', '-qm', 'base with contract']):
-        subprocess.run(['git', '-c', 'user.email=a@b', '-c', 'user.name=a'] + c, cwd=main, check=True, capture_output=True)
+        EG.git(EG.IDENT + c, cwd=main)
     timings = {}
     t0 = time.time()
     team(main, 'init', '--goal', 'Checkout totals: subtotal, tax, shipping, receipt',
@@ -218,4 +221,6 @@ def main():
 
 
 if __name__ == '__main__':
+    if not EG.require('pytest', 'delegation'):
+        sys.exit(0)
     main()

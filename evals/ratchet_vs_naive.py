@@ -1,7 +1,13 @@
 """Seven scripted iterations (four typical agent mistakes, three honest steps) through a naive
 "failing count did not rise" gate and through ratchet. Needs pytest. Run: python3 evals/ratchet_vs_naive.py"""
 import os, re, shutil, subprocess, sys
-import os, tempfile
+import tempfile
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _eval_git as EG  # noqa: E402
+
+if not EG.require('pytest', 'ratchet vs naive'):
+    sys.exit(0)
+
 OVERMIND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORK = tempfile.mkdtemp(prefix='overmind-eval-')
 R = os.path.join(OVERMIND, 'skills', 'ratchet', 'scripts', 'ratchet.py')
@@ -11,7 +17,7 @@ def w(rel, text):
     p = os.path.join(D, rel); os.makedirs(os.path.dirname(p), exist_ok=True); open(p, 'w').write(text)
 def run(*a):
     p = subprocess.run([sys.executable, R, '--repo', D] + list(a), capture_output=True, text=True); return p.returncode, p.stdout + p.stderr
-def g(*a): subprocess.run(['git', '-c', 'user.email=a@b', '-c', 'user.name=a'] + list(a), cwd=D, check=True, capture_output=True)
+def g(*a): EG.git(EG.IDENT + list(a), cwd=D)
 
 PRICING = '''def total(items):
     return sum(items)
@@ -97,7 +103,7 @@ for label, files in ITERS:
     why = [l.strip() for l in out.splitlines() if re.match(r'\s+(regression|api|drift|tamper|frozen-test|quality|gained)\s', l)]
     print('--- %s' % label); print(out.rstrip())
     if verdict in ('REJECT', 'STALL'):
-        before = subprocess.run(['git', 'status', '--porcelain'], cwd=D, capture_output=True, text=True).stdout
+        before = EG.git(['status', '--porcelain'], cwd=D, check=False).stdout
         run('revert', '--clean')
         floor_ck = re.search(r'"checkpoint": "(\w+)"', open(os.path.join(D, '.overmind/ratchet/floor.json')).read()).group(1)
         diff = subprocess.run([sys.executable, '-c', 'import sys; sys.path.insert(0, "%s"); import ratchet as r; print(len(r.diff_vs("%s", "%s", ["--name-only"]).split()))' % (os.path.dirname(R), D, floor_ck)], capture_output=True, text=True).stdout.strip()
