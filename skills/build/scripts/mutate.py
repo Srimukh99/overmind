@@ -5,7 +5,7 @@ Injects one small bug at a time (flip an operator or comparison, nudge a
 constant, return None, invert a condition) and reruns the tests. A surviving
 mutant is a bug no test would catch. Stdlib only; restores files afterwards.
 """
-import ast, copy, re, subprocess
+import ast, copy, os, re, subprocess
 
 SWAP = {ast.Add: ast.Sub, ast.Sub: ast.Add, ast.Mult: ast.FloorDiv, ast.FloorDiv: ast.Mult,
         ast.Div: ast.Mult, ast.Mod: ast.FloorDiv,
@@ -92,7 +92,8 @@ def run(path, test_cmd, cwd, ranges=None, max_mutants=60, timeout=60):
             with open(path, 'w', encoding='utf-8') as fh:
                 fh.write(ast.unparse(t))
             try:
-                rc = subprocess.run(test_cmd, cwd=cwd, shell=True, capture_output=True, timeout=timeout).returncode
+                rc = subprocess.run(test_cmd, cwd=cwd, shell=True, capture_output=True, timeout=timeout,
+                                    env={**os.environ, 'PYTHONBREAKPOINT': '0'}).returncode
             except subprocess.TimeoutExpired:
                 rc = 124  # a hang is a detected change
             if rc != 0:

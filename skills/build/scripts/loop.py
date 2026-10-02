@@ -14,10 +14,17 @@ KEY = re.compile(r'error|fail|assert|exception|traceback|panic|expected|received
 NOISE = re.compile(r'^\s*(at |File "/usr|node_modules|site-packages|\s*$)')
 
 
+# A leftover breakpoint() would drop the child into pdb and hold the run until
+# the timeout expires. Neutralise it so the suite reports; vibe-check still
+# FAILs the leftover at the gate.
+NO_BREAK = {'PYTHONBREAKPOINT': '0'}
+
+
 def sh(cmd, cwd, timeout):
     t = time.time()
     try:
-        p = subprocess.run(cmd, cwd=cwd, shell=True, capture_output=True, text=True, timeout=timeout)
+        p = subprocess.run(cmd, cwd=cwd, shell=True, capture_output=True, text=True, timeout=timeout,
+                           env={**os.environ, **NO_BREAK})
         return p.returncode, (p.stdout or '') + (p.stderr or ''), time.time() - t
     except subprocess.TimeoutExpired:
         return 124, 'timed out after %ds' % timeout, time.time() - t

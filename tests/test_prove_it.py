@@ -2,6 +2,8 @@ import os, sys, shutil, subprocess, tempfile, unittest, io, contextlib
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'skills', 'build', 'scripts'))
 import loop as L, tamper as T
+sys.path.insert(0, os.path.join(ROOT, 'skills', 'ratchet', 'scripts'))
+import mutate as M, ratchet as R
 
 BASE = '''import unittest
 from money import add_tax
@@ -75,5 +77,59 @@ class Loop(unittest.TestCase):
     def test_digest_keeps_signal(self):
         out = '\n'.join(['noise'] * 200 + ['tests/a.py:12: AssertionError: 3 != 4', 'FAILED (failures=1)'])
         d = L.digest(out); self.assertTrue(any('3 != 4' in l for l in d)); self.assertLess(len(d), 15)
+
+BP_SRC = """import unittest
+from pkg.calc import total
+class T(unittest.TestCase):
+    def test_total(self): self.assertEqual(total(2, 3), 5)
+"""
+
+
+class InteractiveDebuggerTripwire(unittest.TestCase):
+    """A planted breakpoint() must not stall a runner until its timeout expires.
+
+    vibe-check still FAILs the leftover at the gate; these runners just must not
+    pay ten minutes of wall clock to discover it.
+    """
+
+    def setUp(self):
+        self.d = tempfile.mkdtemp()
+        self.probe = os.path.join(self.d, 'probe.py')
+        open(self.probe, 'w').write(
+            'import os\nprint("BP=" + os.environ.get("PYTHONBREAKPOINT", "unset"))\n')
+        self.cmd = '%s %s' % (sys.executable, self.probe)
+
+    def tearDown(self):
+        shutil.rmtree(self.d)
+
+    def test_loop_runner_disables_breakpoint(self):
+        rc, out, _ = L.sh(self.cmd, self.d, 20)
+        self.assertIn('BP=0', out)
+
+    def test_ratchet_runner_disables_breakpoint(self):
+        rc, out = R.sh(self.cmd, self.d, 20)
+        self.assertIn('BP=0', out)
+
+    def test_mutate_runner_disables_breakpoint(self):
+        src = os.path.join(self.d, 'm.py')
+        open(src, 'w').write('def total(a, b):\n    return a + b\n')
+        sink = os.path.join(self.d, 'env.txt')
+        probe_cmd = '%s %s > %s' % (sys.executable, self.probe, sink)
+        M.run(src, probe_cmd, self.d, timeout=20)  # default max_mutants; 1 hits an unrelated bug
+        self.assertIn('BP=0', open(sink).read())
+
+    def test_planted_breakpoint_does_not_burn_the_timeout(self):
+        """End to end: the suite still runs and reports, instead of timing out."""
+        os.makedirs(os.path.join(self.d, 'pkg'))
+        os.makedirs(os.path.join(self.d, 'tests'))
+        open(os.path.join(self.d, 'pkg', '__init__.py'), 'w').close()
+        open(os.path.join(self.d, 'pkg', 'calc.py'), 'w').write(
+            'def total(a, b):\n    breakpoint()\n    return a + b\n')
+        open(os.path.join(self.d, 'tests', 'test_calc.py'), 'w').write(BP_SRC)
+        cmd = '%s -m unittest discover -q -s tests' % sys.executable
+        rc, out, dt = L.sh(cmd, self.d, 15)
+        self.assertNotIn('timed out', out)
+        self.assertLess(dt, 10, out)
+        self.assertEqual(rc, 0, out)
 
 if __name__ == '__main__': unittest.main()

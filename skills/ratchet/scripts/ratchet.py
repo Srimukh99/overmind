@@ -70,8 +70,10 @@ def git_bytes(args, cwd, env=None):
 
 
 def sh(cmd, cwd, timeout=900):
+    # See loop.py: a leftover breakpoint() must not hold the run to its timeout.
     try:
-        p = subprocess.run(cmd, cwd=cwd, shell=True, capture_output=True, text=True, timeout=timeout)
+        p = subprocess.run(cmd, cwd=cwd, shell=True, capture_output=True, text=True, timeout=timeout,
+                           env={**os.environ, 'PYTHONBREAKPOINT': '0'})
         return p.returncode, (p.stdout or '') + (p.stderr or '')
     except subprocess.TimeoutExpired:
         return 124, 'timed out'
