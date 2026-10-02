@@ -56,3 +56,5 @@ jobs:
         run: sh evals/mutation/run.sh
       - name: Code quality - green suite vs correct code
         run: python3 evals/code_quality.py
+      - name: Guidance coverage - does the advice name the defect classes
+        run: python3 evals/guidance_coverage.py --quiet

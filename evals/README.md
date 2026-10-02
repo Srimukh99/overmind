@@ -11,6 +11,7 @@ not agent behaviour: the cheating diffs and agent mistakes are scripted.
 | Tamper guard | `python3 evals/tamper_guard.py` | 19 of 19 cheats flagged (15 as FAIL); 0 of 12 honest changes failed |
 | Passing tests vs real checks | `sh evals/mutation/run.sh` | weak suite 24% (8 of 33 bugs caught), strong suite 100% (33 of 33); both suites pass |
 | ratchet vs naive gate | `python3 evals/ratchet_vs_naive.py` | ratchet 7 of 7 correct; naive gate 2 of 7 |
+| Guidance coverage: does the advice name the defects that ship? | `python3 evals/guidance_coverage.py` | overmind 6/6 core and 2/4 extended; superpowers 2/6 and 1/4 |
 | Code quality: does a green suite mean correct code? | `python3 evals/code_quality.py` (`-v` to name each hidden failure) | 6 of 6 candidates pass their own suite; 3 are wrong; 10 hidden defects would have shipped. Mutation score does **not** separate them |
 
 Every row above was re-run at v0.7. `delegation.py`, `ratchet_vs_naive.py` and
@@ -65,6 +66,39 @@ What did separate thin from solid: nothing in the toolchain. Only the hidden
 suite, which is to say only writing the boundary cases in the first place.
 That is a guidance gap, not a tooling gap, and it is the target for the
 reference-depth work in `docs/specs/2026-10-02-methodology-depth-design.md`.
+
+## Guidance coverage: what the score does and does not mean
+
+`code_quality.py` showed that no tool in the box separates a thin
+implementation from a solid one. `guidance_coverage.py` measures the thing that
+does: whether the advice given at the moment tests are written names each
+defect class. Two scores, and the second is the honest one.
+
+**Core classes** are derived from `code_quality.py`'s hidden suites. overmind
+scores 6/6 against superpowers' 2/6 - but that taxonomy came from the same
+three tasks the guidance was then written against, so read it as a floor on
+what the guidance covers, not as a measure of breadth.
+
+**Extended classes** are canonical categories *not* derived from those tasks:
+null handling, large input, concurrency, locale. overmind scores 2/4 and
+superpowers 1/4. That narrow lead is the trustworthy number.
+
+Neither score says the guidance works. The metric checks that a class is
+*named*, which is necessary and not sufficient; whether naming it changes what
+an agent writes needs the agent comparison this directory still lacks.
+
+The metric is gameable by listing keywords, so it prints the matched line for
+every hit - read them. Six measurement defects were found and fixed while
+building it, each of which would have changed the verdict: "Mock only slow or
+external boundaries" scoring as boundary-value guidance, "improve beyond the
+test" as out-of-range, "Partial mocks fail silently" as a partial last chunk,
+`\bevery` matching "everything", a genuine superpowers line ("zero, empty, nil
+... input") being missed, and - worst - a sentence saying locale is out of
+scope scoring as locale coverage. `tests/test_guidance_coverage.py` keeps all
+six fixed.
+
+Concurrency and locale were deliberately left out of overmind's table rather
+than added to raise the score; `prove-it.md` states why in the file.
 
 ## Routing eval: what it is and is not
 

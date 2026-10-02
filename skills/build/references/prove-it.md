@@ -32,6 +32,39 @@ Read script summaries, never raw test output.
 - Import names that don't exist yet inside the test, not at the top of the file, so one missing name doesn't hide every other result.
 - Synthetic data only. Never real patient, card, SSN or customer data.
 
+## Boundaries worth a test
+Agents test the happy path and stop, which is why a green suite and a correct
+implementation are different things. Before a behaviour counts as tested, walk
+this list and write a test for every row that applies. Most defects that reach
+production live at an edge, not in the middle of the range.
+
+| Class | Ask | Bug it catches |
+| --- | --- | --- |
+| Boundary | Is the range half-open or closed? What happens exactly at the edge? | off-by-one; touching intervals treated as overlapping |
+| Empty | What does an empty list, string, interval or slice do? | a zero-length range matching everything |
+| Clamp | Can the result go below zero or above a cap? Does it floor, wrap or raise? | a discount making a total negative |
+| Numeric type | Integer or float? Which way does it round? Money in integer cents? | floating-point drift turning 999 into 899.1 |
+| Partial last | May the final page, chunk or batch be short? | a short last page reporting a full count |
+| Out of range | What does input past the end return? | page 11 of 10 returning data |
+| Duplicates | Repeated keys, repeated items, the same call twice | a retry charging twice |
+| Null and missing | What does None, null or an absent field do - default, raise, or propagate? | a missing field read as a valid empty value |
+| Large input | What happens at 10x the expected size? Is there a cap, and is it tested? | a large payload timing out past a limit nobody set |
+| Encoding and time | Non-ASCII, time zones, DST, leap days | a name truncated mid-codepoint |
+
+Two shortcuts: one property test over the input space (see "Pick the mode
+first") covers several rows at once and is cheaper than eight examples; and for
+each row you skip, you should be able to say why it cannot apply.
+
+This table stops at defects a unit test can reach. Races, locale and resource
+exhaustion are real and are not here: they need the service running, so they
+belong to `observe` and `firefight`, not to the inner loop. A checklist that
+lists everything gets skipped.
+
+`loop.py mutate` does not substitute for this. It measures whether your suite
+exercises the code you wrote, so a thin implementation with few branches can
+score higher than a careful one with guards your tests never reach. It tells you
+whether a suite is real; it cannot tell you whether the code is right.
+
 ## Never
 - Edit, skip or delete a test to make it pass. If the test is wrong, say so explicitly first.
 - Write code before its test, then retrofit a test around it.
@@ -56,6 +89,8 @@ line with a `prove-it: ok` comment.
 Throwaway spikes (deleted after), generated code, pure config. Say when you use one.
 
 ## Done when
-New tests failed first and pass now, `loop.py full` is green, `tamper.py` is clean,
-and for logic-heavy code `loop.py mutate` reports no uncaught bugs in the change.
+New tests failed first and pass now, every applicable row of "Boundaries worth a
+test" has a test or a stated reason it cannot apply, `loop.py full` is green,
+`tamper.py` is clean, and for logic-heavy code `loop.py mutate` reports no
+uncaught bugs in the change.
 Show both outputs (`ship`).
