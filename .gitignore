@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.worktrees/
+.env
+.overmind/state.jsonl
+.overmind/services.json
+.DS_Store

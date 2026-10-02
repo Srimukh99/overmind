@@ -1,0 +1,19 @@
+{
+  "name": "overmind",
+  "version": "0.7.0",
+  "description": "Lean engineering skills for coding agents: 14 core skills (design, build, debug, review, ship, SRE and IaC checks) plus optional packs for regulated work, data stores, Kubernetes and APIs.",
+  "author": {
+    "name": "Srimukh"
+  },
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "tdd",
+    "debugging",
+    "code-review",
+    "hipaa",
+    "pci",
+    "postgres",
+    "kubernetes"
+  ]
+}

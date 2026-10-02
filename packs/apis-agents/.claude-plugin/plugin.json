@@ -1,0 +1,9 @@
+{
+  "name": "overmind-apis-agents",
+  "version": "0.7.0",
+  "description": "API design (REST, GraphQL, gRPC) and tool design for AI agents and MCP servers.",
+  "author": {
+    "name": "Srimukh"
+  },
+  "license": "MIT"
+}

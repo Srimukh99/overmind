@@ -1,0 +1,9 @@
+{
+  "name": "overmind-k8s",
+  "version": "0.7.0",
+  "description": "Kubernetes pod and rollout triage, git-versus-live drift checks, and CRD validation.",
+  "author": {
+    "name": "Srimukh"
+  },
+  "license": "MIT"
+}

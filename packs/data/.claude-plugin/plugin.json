@@ -1,0 +1,9 @@
+{
+  "name": "overmind-data",
+  "version": "0.7.0",
+  "description": "Postgres, MongoDB, Snowflake and Databricks performance and safe schema changes.",
+  "author": {
+    "name": "Srimukh"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,32 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependency
+        run: pip install pyyaml
+      - name: Lint skills
+        run: python3 tools/lint_skills.py
+      - name: Layout check
+        run: python3 tools/check_layout.py
+      - name: Unit tests
+        run: python3 -m unittest discover -s tests -v
+      - name: vibe-check (changes in this PR or push)
+        run: |
+          BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            python3 skills/ship/scripts/vibe_check.py --all
+          else
+            python3 skills/ship/scripts/vibe_check.py --range "$BASE...HEAD"
+          fi
