@@ -25,7 +25,15 @@ jobs:
       - name: vibe-check (changes in this PR or push)
         run: |
           BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
-          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+          # github.event.before can name a commit that is no longer in the
+          # repository: after a force-push it points at the replaced history,
+          # and on a branch's first push it is all zeros. Either way the range
+          # is unusable, so check the commit is actually present and scan the
+          # whole tree when it is not.
+          if [ -z "$BASE" ] \
+            || [ "$BASE" = "0000000000000000000000000000000000000000" ] \
+            || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "base $BASE unusable; scanning every tracked file"
             python3 skills/ship/scripts/vibe_check.py --all
           else
             python3 skills/ship/scripts/vibe_check.py --range "$BASE...HEAD"
