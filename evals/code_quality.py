@@ -33,8 +33,8 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OVERMIND = os.path.dirname(HERE)
-sys.path.insert(0, os.path.join(OVERMIND, 'skills', 'build', 'scripts'))
+RUBRIC = os.path.dirname(HERE)
+sys.path.insert(0, os.path.join(RUBRIC, 'skills', 'build', 'scripts'))
 import mutate as M  # noqa: E402
 
 TASKS = {}
@@ -218,7 +218,7 @@ def _count(output):
 
 
 def score(name, task, variant, verbose=False):
-    with tempfile.TemporaryDirectory(prefix='overmind-cq-') as d:
+    with tempfile.TemporaryDirectory(prefix='rubric-cq-') as d:
         impl = task[variant]
 
         # 1. the suite the implementer wrote

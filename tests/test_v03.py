@@ -58,7 +58,7 @@ class LogFetch(unittest.TestCase):
         w(self.d, 'logging/vector.toml', '[sinks.out]\ntype = "loki"\n')
         self.assertEqual(self.svc('notify')['ships_to'], ['loki'])
     def test_map_ignores_own_cache(self):
-        w(self.d, '.overmind/services.json', '{"x": "promtail"}')
+        w(self.d, '.rubric/services.json', '{"x": "promtail"}')
         self.assertNotIn('agent_promtail', SM.build(self.d)['signals'])
     def pick(self, name, signals):
         data = SM.build(self.d); usable, _ = LF.choose_backend(data['services'][name], signals)

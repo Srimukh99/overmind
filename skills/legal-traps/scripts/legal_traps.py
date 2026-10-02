@@ -8,7 +8,7 @@ Heuristic: catches the usual traps, not every case. Not legal advice.
 import argparse, json, os, re, sys
 
 SKIP = {'.git', 'node_modules', '.venv', 'venv', '__pycache__', 'dist', 'build',
-        '.next', '.overmind', 'vendor', 'coverage', '.terraform',
+        '.next', '.rubric', 'vendor', 'coverage', '.terraform',
         'tests', 'test', '__tests__', 'spec', 'fixtures', 'e2e', 'cypress'}  # tests don't ship
 EXTS = {'.html', '.htm', '.css', '.scss', '.js', '.jsx', '.ts', '.tsx', '.vue',
         '.svelte', '.py', '.rb', '.php', '.go', '.java', '.kt', '.swift', '.mjml',

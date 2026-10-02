@@ -1,10 +1,12 @@
-# overmind
+# rubric
 
-**The mind above your agents.** · v0.7
+**The standard your coding agent is held to.** · v0.8
 
-overmind is an engineering methodology for coding agents, delivered as a library of composable skills. It gives an agent the habits a senior team takes for granted: establish a design before writing code, drive implementation with tests, debug from evidence rather than guesswork, review a change before merging it, and prove work is finished before claiming it is.
+rubric is an engineering methodology for coding agents, delivered as a library of composable skills. It gives an agent the habits a senior team takes for granted: establish a design before writing code, drive implementation with tests, debug from evidence rather than guesswork, review a change before merging it, and prove work is finished before claiming it is.
 
-Fourteen core skills cover the full delivery cycle. Four optional packs add depth for regulated domains, data platforms, Kubernetes, and API and agent design.
+What separates it from a document of good intentions is that the important parts are executable. A gate blocks secrets and debug leftovers before a commit. A guard detects a test that was weakened to make a build pass. An iteration loop reverts any step that regresses. None of that depends on a model remembering to be careful.
+
+Fourteen core skills cover the delivery cycle. Four optional packs add depth for regulated domains, data platforms, Kubernetes, and API and agent design.
 
 ## Table of Contents
 
@@ -24,7 +26,7 @@ Fourteen core skills cover the full delivery cycle. Four optional packs add dept
   - [Scripts](#scripts)
 - [The ship gate](#the-ship-gate)
 - [Token budget](#token-budget)
-- [Upgrading from 0.5](#upgrading-from-05)
+- [Upgrading](#upgrading)
 - [Contributing](#contributing)
 - [Support](#support)
 - [Roadmap](#roadmap)
@@ -33,11 +35,11 @@ Fourteen core skills cover the full delivery cycle. Four optional packs add dept
 
 ## How it works
 
-Skills activate from the request itself. When you ask for a feature, `design` turns a vague ask into an agreed design and then into small tasks with named files and explicit checks. When you ask for a fix, `debug` reaches for evidence before it reaches for a patch. The `boot` skill routes anything that does not match a skill directly, so there is no command to remember and no mode to enter.
+Skills activate from the request itself. Ask for a feature and `design` turns a vague ask into an agreed design, then into small tasks with named files and explicit checks. Ask for a fix and `debug` reaches for evidence before it reaches for a patch. The `boot` skill routes anything that does not match a skill directly, so there is no command to remember and no mode to enter.
 
-Deterministic work belongs in code, not in the model. Logs, manifests, infrastructure definitions and dependency trees are parsed by small Python scripts that emit a compact summary, and the agent reads that summary instead of thousands of raw lines. The result is lower token use and answers that do not drift between runs.
+Deterministic work belongs in code, not in the model. Logs, manifests, infrastructure definitions and dependency trees are parsed by small Python scripts that emit a compact summary, and the agent reads that summary instead of thousands of raw lines. Token use drops and the answers stop drifting between runs.
 
-The process is built to resist the two failure modes that cost the most. Work that takes several attempts runs under `ratchet`, which anchors the goal, freezes the tests that already pass, measures each iteration against a floor that only rises, and reverts any step that regresses. Work split across parallel agents runs under `delegate`, which is contract-first: the lead defines the shared contract, each worker owns a disjoint set of files in its own worktree, and results are verified against each worker's own test verdict rather than accepted on the worker's word.
+The process is built around the two failure modes that cost the most. Work that takes several attempts runs under `ratchet`, which anchors the goal, freezes the tests that already pass, measures each iteration against a floor that only rises, and reverts any step that regresses. Work split across parallel agents runs under `delegate`, which is contract-first: the lead defines the shared contract, each worker owns a disjoint set of files in its own worktree, and results are verified against each worker's own test verdict rather than accepted on its word.
 
 Nothing is reported as complete without evidence. The `ship` skill requires command output from the current session before a claim of done, fixed or passing, and its gate blocks secrets, regulated identifiers and debugging leftovers before a commit lands.
 
@@ -49,24 +51,24 @@ Nothing is reported as complete without evidence. The `ship` skill requires comm
 
 ## Installation
 
-Install overmind separately for each agent you use. Core skills always install; packs are opt-in.
+Install rubric separately for each agent you use. Core skills always install; packs are opt-in.
 
 ### Claude Code
 
 As a plugin, from the marketplace in this repository:
 
 ```text
-/plugin marketplace add Srimukh99/overmind
-/plugin install overmind@overmind
+/plugin marketplace add Srimukh99/rubric
+/plugin install rubric@rubric
 ```
 
 Packs are published as separate plugins:
 
 ```text
-/plugin install overmind-regulated@overmind
-/plugin install overmind-data@overmind
-/plugin install overmind-k8s@overmind
-/plugin install overmind-apis-agents@overmind
+/plugin install rubric-regulated@rubric
+/plugin install rubric-data@rubric
+/plugin install rubric-k8s@rubric
+/plugin install rubric-apis-agents@rubric
 ```
 
 ### Codex, Kiro and Qwen Code
@@ -74,12 +76,12 @@ Packs are published as separate plugins:
 Clone the repository and run the installer from the project you want to equip:
 
 ```bash
-git clone https://github.com/Srimukh99/overmind
+git clone https://github.com/Srimukh99/rubric
 cd your-project
 
-/path/to/overmind/install.sh --agent all                        # this project
-/path/to/overmind/install.sh --agent all --scope user           # every project
-/path/to/overmind/install.sh --agent all --pack regulated,data  # with packs
+/path/to/rubric/install.sh --agent all                        # this project
+/path/to/rubric/install.sh --agent all --scope user           # every project
+/path/to/rubric/install.sh --agent all --pack regulated,data  # with packs
 ```
 
 `--agent all` installs for Claude Code, Codex, Kimi Code, Kiro and Qwen Code. Full options:
@@ -96,7 +98,7 @@ cd your-project
 Install with `--agent cursor` alone. Cursor reads `.cursor/skills/`, `.claude/skills/` and `.agents/skills/`, so installing for several agents at once would list every skill more than once.
 
 ```bash
-/path/to/overmind/install.sh --agent cursor
+/path/to/rubric/install.sh --agent cursor
 ```
 
 ### Other agents
@@ -104,7 +106,7 @@ Install with `--agent cursor` alone. Cursor reads `.cursor/skills/`, `.claude/sk
 One command, which detects the agent and installs everything it finds, packs included:
 
 ```bash
-npx skills add Srimukh99/overmind
+npx skills add Srimukh99/rubric
 ```
 
 ### Agent support matrix
@@ -116,7 +118,7 @@ npx skills add Srimukh99/overmind
 | Kiro | `--agent kiro` | `.kiro/skills/` |
 | Qwen Code | `--agent qwen` | `.qwen/skills/` |
 | Cursor | `--agent cursor` | `.cursor/skills/` (also reads `.claude/skills/`, `.agents/skills/`) |
-| Gemini CLI, GitHub Copilot, OpenCode, Roo Code, Goose and others | `npx skills add Srimukh99/overmind` | the agent's own directory |
+| Gemini CLI, GitHub Copilot, OpenCode, Roo Code, Goose and others | `npx skills add Srimukh99/rubric` | the agent's own directory |
 
 Skills are loaded by the agent application rather than the model, so any model works inside an application that supports the format.
 
@@ -143,17 +145,16 @@ Skills are checked before the task begins, not offered afterwards.
 
 ## Evidence
 
-Each mechanism is measured against the naive alternative, with scripted
-adversaries rather than prose argument. Every figure below is reproducible on
-your own machine; `evals/README.md` has the full method and caveats.
+Each mechanism is measured against the alternative, using scripted adversaries rather than argument. Every figure is reproducible on your machine; `evals/README.md` has the method and the caveats, and CI runs all five on every push.
 
-| Mechanism | overmind | The naive alternative |
+| Mechanism | rubric | The alternative |
 | --- | --- | --- |
-| **Contract-first delegation** (`delegate`) | **8 of 8** contract tests passing, **0** bad changes reached main | trust each worker's claim: 2 of 8 passing, **4** bad changes landed |
-| **Rising-floor iteration** (`ratchet`) | **7 of 7** iterations judged correctly | "the failing count did not rise" gate: 2 of 7 |
+| **Contract-first delegation** (`delegate`) | **8 of 8** contract tests passing, **0** bad changes reached main | trust each worker's claim: 2 of 8, and **4** bad changes landed |
+| **Rising-floor iteration** (`ratchet`) | **7 of 7** iterations judged correctly | a "the failing count did not rise" gate: 2 of 7 |
 | **Test-tampering guard** (`build`) | **19 of 19** cheats flagged, **0 of 12** honest changes wrongly failed | nothing stops a skipped or weakened test |
-| **Mutation testing** (`build`) | strong suite kills **33 of 33** injected bugs | a green suite that kills **8 of 33** — and still reports all tests passing |
-| **Skill routing** (`boot`) | **98%** top-1, **100%** top-3, every legacy trigger preserved | 3.6% by chance across 28 skills |
+| **Mutation testing** (`build`) | a strong suite kills **33 of 33** injected bugs | a green suite that kills **8 of 33** — and still reports every test passing |
+| **Skill routing** (`boot`) | **98%** top-1, **100%** top-3, 76% on a frozen held-out set, every legacy trigger preserved | 3.6% by chance across 28 skills |
+| **Boundary guidance** (`build`) | names **6 of 6** defect classes the acceptance suites exercise, and **10 of 10** real defects are reachable from it | a green suite: **6 of 6** candidates pass their own tests and **3 are wrong** |
 
 ```bash
 python3 evals/delegation.py          # needs pytest
@@ -161,17 +162,19 @@ python3 evals/ratchet_vs_naive.py    # needs pytest
 python3 evals/tamper_guard.py
 sh evals/mutation/run.sh             # needs pytest + hypothesis
 python3 evals/routing.py
+python3 evals/code_quality.py
+python3 evals/guidance_coverage.py
 ```
 
-The mutation row is the one worth dwelling on: both suites pass. A green
-test run tells you nothing about whether the tests check anything, and the
-difference between those two suites is 24% against 100%.
+Two results are worth dwelling on, because both are uncomfortable.
 
-**What these evals do not show.** The adversaries are scripted, not real
-agents, so these measure whether the tooling catches known mistakes, not
-whether an agent using overmind produces better code than one without it.
-That comparison needs a model API key and is not built; `evals/README.md`
-says so plainly, and it is on the roadmap rather than claimed here.
+**A green test run proves nothing on its own.** In `evals/mutation`, two suites both pass; one catches 24% of injected bugs and the other 100%. In `evals/code_quality.py`, all six candidate implementations pass the tests their author wrote, three are wrong, and ten defects would have shipped.
+
+**Mutation score does not grade your code.** The same eval found it anti-correlated across implementations: thin candidates averaged 83%, careful ones 62%, because a thin implementation has fewer branches for a shallow suite to miss. Mutation score tells you whether a suite is real. It cannot tell you whether the code is right, and `--min` will not catch a thin implementation.
+
+### What these evals do not show
+
+The adversaries are scripted, not live agents. These measure whether the tooling catches known mistakes — not whether an agent using rubric writes better code than one without it. That comparison needs a model API key and is deliberately not built here. The boundary-guidance figures carry a further caveat: the defect taxonomy was derived from the same acceptance suites the guidance was then written against, so read the four classes drawn from outside those tasks as the honest signal rather than the headline number.
 
 ## What's inside
 
@@ -182,7 +185,7 @@ says so plainly, and it is on the roadmap rather than claimed here.
 
 **Design and implementation**
 - **design** — A fuzzy ask into an approved design, then small verifiable tasks
-- **build** — Isolated worktree, test-first loop, tiered checks, mutation testing, and a guard that catches skipped or weakened tests
+- **build** — Isolated worktree, test-first loop, tiered checks, a boundary-case table, mutation testing, and a guard that catches skipped or weakened tests
 - **ratchet** — Iterations that must improve the code without breaking what works or drifting from the goal
 - **delegate** — Contract-first parallel work with disjoint file ownership and verified, not trusted, results
 
@@ -218,7 +221,7 @@ Each skill opens with a short table of situations pointing to a single reference
 
 ### Scripts
 
-Sixteen scripts carry the deterministic work. Fourteen run standalone and print a compact summary; `mutate.py` and `backends.py` are imported by `loop.py` and `log_fetch.py` respectively. The commands you invoke directly:
+Sixteen scripts carry the deterministic work. Fourteen run standalone and print a compact summary; `mutate.py` and `backends.py` are imported by `loop.py` and `log_fetch.py`. The commands you invoke directly:
 
 ```bash
 kubectl logs pod/api-7d9f --previous | python3 skills/debug/scripts/log_trace.py --repo .
@@ -240,7 +243,7 @@ python3 packs/k8s/skills/crd-check/scripts/crd_check.py deploy/ --target 1.30
 python3 packs/k8s/skills/drift/scripts/drift_check.py --k8s-dir deploy/ -n prod
 ```
 
-Most of these only read. The ones that write say so: `ratchet` keeps state in `.overmind/` and checkpoints under `refs/overmind/`, `team` creates worktrees and applies patches, `loop.py mutate` edits changed files and restores them, `service_map.py --okf` writes `docs/okf`, and `vibe_check.py --install-hook` writes a commit hook. `drift_check.py` never writes to a cluster, only to a local history file.
+Most of these only read. The ones that write say so: `ratchet` keeps state in `.rubric/` and checkpoints under `refs/rubric/`, `team` creates worktrees and applies patches, `loop.py mutate` edits changed files and restores them, `service_map.py --okf` writes `docs/okf`, and `vibe_check.py --install-hook` writes a commit hook. `drift_check.py` never writes to a cluster, only to a local history file.
 
 ## The ship gate
 
@@ -267,13 +270,34 @@ python3 skills/ship/scripts/vibe_check.py --install-hook   # run on every commit
 
 A deliberate false positive can carry `vibe-check: ignore` on the line, used sparingly and explained in the pull request.
 
-Project-specific commands go one per line in `.overmind/checks`, and each fails the gate on a non-zero exit. Those are shell commands read from the repository, so review that file before running the gate somewhere you do not control. The workflow in `.github/workflows/ci.yml` runs skill lint, the layout check, the unit suite and the gate on every push and pull request.
+Project-specific commands go one per line in `.rubric/checks`, and each fails the gate on a non-zero exit. Those are shell commands read from the repository, so review that file before running the gate somewhere you do not control. The workflow in `.github/workflows/ci.yml` runs skill lint, the layout check, the unit suite and the gate on every push and pull request, and a second job runs all five evals.
 
 ## Token budget
 
-Only skill names and descriptions occupy context until a skill is used. The 14 core descriptions total roughly 680 tokens; the four packs add roughly 620 more. Opening a skill loads its table, between 200 and 460 tokens, and then one reference file, so a working session reads far less than a library that keeps its guidance in prose. Run `python3 tools/lint_skills.py` for the current figures and `python3 evals/routing.py` to check that description edits have not cost any routing accuracy.
+Only skill names and descriptions occupy context until a skill is used. The 14 core descriptions total roughly 680 tokens; the four packs add roughly 620 more. Opening a skill loads its table, between 200 and 460 tokens, and then one reference file — so a working session reads far less than a library that keeps its guidance in prose. Run `python3 tools/lint_skills.py` for the current figures, and `python3 evals/routing.py` to confirm that a description edit has not cost any routing accuracy.
 
-## Upgrading from 0.5
+## Upgrading
+
+### From overmind
+
+This project was called overmind through v0.7. The name collided with four separate projects over 500 stars, including a 3,747-star Procfile manager, so v0.8 renames it.
+
+| Was | Now |
+| --- | --- |
+| `.overmind/` | `.rubric/` |
+| `refs/overmind/` | `refs/rubric/` |
+| `REPO.overmind-team/` | `REPO.rubric-team/` |
+| `overmind@overmind`, `overmind-regulated`, … | `rubric@rubric`, `rubric-regulated`, … |
+
+Skill names, script names and script paths are unchanged. To carry existing state across:
+
+```bash
+git mv .overmind .rubric            # project state, loop.json, checks
+```
+
+A ratchet in progress is simplest to restart, since its checkpoints live under the old ref namespace. Reinstall the Claude plugins under their new names. The GitHub repository keeps a permanent redirect, so `npx skills add Srimukh99/overmind` continues to work.
+
+### From 0.5
 
 <!-- upgrade:start -->
 Version 0.5 had 41 skills. Nothing was removed: instructions moved into `references/` files and every script is unchanged. Old names map as follows.
@@ -296,7 +320,7 @@ Script paths moved with their skills: `skills/prove-it/scripts/loop.py` is now `
 
 1. Read `skills/forge/SKILL.md`, which defines the format and the standard for proving a skill helps.
 2. One skill per pull request, with the three should-trigger and two should-not prompts you tested in the description.
-3. CI must pass: skill lint, layout check, unit tests and the gate.
+3. CI must pass: skill lint, layout check, unit tests, the gate, and the evals.
 4. Core stays at 14 skills or fewer. A new specialist skill belongs in a pack under `packs/NAME/skills/`; a new job inside an existing skill belongs in its `references/` directory.
 5. Original wording only, in skills and in references.
 6. Regulated-domain skills need a source for every rule and must stay labelled as engineering guidance rather than legal advice.
@@ -305,14 +329,15 @@ See `CONTRIBUTING.md` for the full process.
 
 ## Support
 
-Questions, defects and feature requests belong in [GitHub Issues](https://github.com/Srimukh99/overmind/issues).
+Questions, defects and feature requests belong in [GitHub Issues](https://github.com/Srimukh99/rubric/issues).
 
 ## Roadmap
 
+- Real agents on real tasks, measured with and without rubric, to go beyond the scripted evals above
 - `idx` — a local repository index so agents look up symbols instead of reading whole files
 - A context-compression harness for tool output
-- Deeper Snowflake, MongoDB, Postgres and agent-design packs
-- Real agents on real tasks, measured with and without overmind, to go beyond the scripted evals below
+- Adversarial evals for the remaining script-backed skills: `ship`, `iac-check`, `legal-traps`, `debug`
+- Deeper reference material for `forge`, `delegate` and `design`, the thinnest skills in the library
 
 ## Scope and limitations
 

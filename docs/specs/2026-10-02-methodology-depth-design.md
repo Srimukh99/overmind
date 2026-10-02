@@ -4,7 +4,7 @@ Date: 2026-10-02 · Status: awaiting review · Scope: v0.8
 
 ## Intent
 
-Make overmind demonstrably strong on methodology depth, which is the one
+Make rubric demonstrably strong on methodology depth, which is the one
 dimension where a measured comparison against superpowers currently favours
 superpowers. Two workstreams, chosen by the maintainer:
 
@@ -22,7 +22,7 @@ moving the always-loaded budget.
 
 Measured at v0.7, not asserted:
 
-| | superpowers | overmind |
+| | superpowers | rubric |
 | --- | --- | --- |
 | Always loaded | 576 tok | 683 tok |
 | Cost per skill opened | ~2,800 tok | ~506 tok |
@@ -39,7 +39,7 @@ numbers: contract-first delegation (8/8 vs 2/8), rising-floor iteration (7/7 vs
 Tokens of SKILL.md plus references, against the nearest superpowers
 counterpart. This is the evidence the priority order rests on.
 
-| overmind skill | table | refs | total | superpowers counterpart | total | ratio |
+| rubric skill | table | refs | total | superpowers counterpart | total | ratio |
 | --- | --- | --- | --- | --- | --- | --- |
 | `forge` | 371 | 0 | 371 | writing-skills | 22,745 | **61.3x** |
 | `delegate` | 637 | 0 | 637 | subagent-driven-development, dispatching-parallel-agents | 14,605 | **22.9x** |
@@ -52,7 +52,7 @@ counterpart. This is the evidence the priority order rests on.
 | `firefight` | 362 | 0 | 362 | none | — | — |
 
 `ship` is already at near-parity, which is consistent with the shipping gate
-being overmind's strongest area. The gap is concentrated in `forge`,
+being rubric's strongest area. The gap is concentrated in `forge`,
 `delegate` and `design` — the skills that carry the *thinking*, which is
 exactly where the depth verdict was lost.
 
@@ -70,14 +70,14 @@ exactly where the depth verdict was lost.
 
 ## Non-goals
 
-- **Agent-based evals.** Comparing real agents with and without overmind needs
+- **Agent-based evals.** Comparing real agents with and without rubric needs
   a model API key, and `AGENTS.md` forbids committing LLM API integrations to
   this repository unless explicitly requested as a feature. `evals/README.md`
   already names this as the honest missing piece. It stays named, not built.
 - **Growing the core past 14 skills.** `forge` caps it; new capability goes in
   a pack or a reference.
 - **Merging or removing skills.** Out of scope; the maintainer declined it.
-- **Session self-diagnosis.** The one capability superpowers has that overmind
+- **Session self-diagnosis.** The one capability superpowers has that rubric
   lacks. The maintainer declined it for now; recorded here so it is not lost.
 
 ## Workstream A: adversarial evals

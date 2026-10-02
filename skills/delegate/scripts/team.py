@@ -13,7 +13,7 @@
   clean      remove worktrees and branches
 
 Workers never share a file, cannot edit the contract, and are judged by checks, not by
-what they say. Worktrees live next to the repo in REPO.overmind-team/.
+what they say. Worktrees live next to the repo in REPO.rubric-team/.
 """
 import argparse, fnmatch, json, os, re, shutil, subprocess, sys, tempfile, time
 
@@ -23,7 +23,7 @@ RATCHET = os.path.join(RATCHET_DIR, 'ratchet.py')
 sys.path.insert(0, RATCHET_DIR)
 import ratchet as R  # noqa: E402
 
-STATE = os.path.join('.overmind', 'team')
+STATE = os.path.join('.rubric', 'team')
 WILD = re.compile(r'[*?\[]')
 TESTDEF = re.compile(r'^\s*(?:async\s+)?def (test_\w+)|^\s*func (Test\w+)\(|^\s*(?:it|test)\(\s*[\'"]([^\'"]+)', re.M)
 
@@ -56,7 +56,7 @@ def need(root):
 
 def team_dir(root):
     root = os.path.realpath(root)
-    return os.path.join(os.path.dirname(root), os.path.basename(root) + '.overmind-team')
+    return os.path.join(os.path.dirname(root), os.path.basename(root) + '.rubric-team')
 
 
 # ------------------------------------------------------------------ ownership
@@ -92,7 +92,7 @@ def contract_globs(plan):
 
 def repo_files(root):
     return [f for f in R.git(['ls-files', '--cached', '--others', '--exclude-standard'], root).splitlines()
-            if not f.startswith('.overmind/')]
+            if not f.startswith('.rubric/')]
 
 
 def contract_tests(root, plan):
@@ -150,8 +150,8 @@ def validate(root, plan):
 
 # ------------------------------------------------------------------ git helpers
 def snapshot(root):
-    """Commit the working tree (incl. untracked, minus .overmind and junk) without touching branch or index."""
-    fd, idx = tempfile.mkstemp(prefix='overmind-team-'); os.close(fd); os.unlink(idx)
+    """Commit the working tree (incl. untracked, minus .rubric and junk) without touching branch or index."""
+    fd, idx = tempfile.mkstemp(prefix='rubric-team-'); os.close(fd); os.unlink(idx)
     env = dict(os.environ, GIT_INDEX_FILE=idx)
     try:
         head = R.git(['rev-parse', '--verify', '-q', 'HEAD'], root)
@@ -159,8 +159,8 @@ def snapshot(root):
             R.git(['read-tree', 'HEAD'], root, env)
         R.git(['add', '-A', '--', '.'] + R.JUNK, root, env, check=True)
         tree = R.git(['write-tree'], root, env, check=True)
-        commit = R.git(['commit-tree', tree, '-m', 'overmind team base'] + (['-p', head] if head else []), root, check=True)
-        R.git(['update-ref', 'refs/overmind/team/base-%s' % commit[:12], commit], root, check=True)
+        commit = R.git(['commit-tree', tree, '-m', 'rubric team base'] + (['-p', head] if head else []), root, check=True)
+        R.git(['update-ref', 'refs/rubric/team/base-%s' % commit[:12], commit], root, check=True)
         return commit
     finally:
         if os.path.exists(idx):
@@ -249,7 +249,7 @@ def brief_text(root, plan, name):
         'Done when these pass: %s' % ', '.join(w['targets']),
         'Loop: one small change, then `%s check`. ACCEPT: continue. REJECT: `%s revert`, try another way. '
         'Stop after 3 non-accepts or at DONE.' % (rcmd, rcmd),
-        'Return: write %s/.overmind/result.json as {"status": "done" or "blocked", "summary": "one line", '
+        'Return: write %s/.rubric/result.json as {"status": "done" or "blocked", "summary": "one line", '
         '"evidence": "your last ratchet check line"}. Reply in 5 lines or fewer.' % wt,
     ]
     return '\n'.join(lines)
@@ -294,7 +294,7 @@ def cmd_spawn(a, root):
         if rc != 0:
             print('%s: ratchet failed to start\n%s' % (n, out)); return 1
         if base not in plan['bases']:
-            floor = json.load(open(os.path.join(wt, '.overmind', 'ratchet', 'floor.json')))
+            floor = json.load(open(os.path.join(wt, '.rubric', 'ratchet', 'floor.json')))
             plan['bases'][base] = floor['passing']
         w.update({'worktree': wt, 'branch': branch, 'base': base, 'verdict': None, 'claim': None, 'reasons': []})
         tline = next((l.strip() for l in out.splitlines() if l.strip().startswith('targets:')), '')
@@ -306,7 +306,7 @@ def cmd_spawn(a, root):
 
 def read_claim(wt):
     try:
-        with open(os.path.join(wt, '.overmind', 'result.json'), encoding='utf-8') as fh:
+        with open(os.path.join(wt, '.rubric', 'result.json'), encoding='utf-8') as fh:
             return (json.load(fh).get('status') or 'none').lower()
     except (OSError, ValueError, AttributeError):
         return 'none'
@@ -444,7 +444,7 @@ def cmd_clean(a, root):
         remove_worktree(root, w.get('worktree') or os.path.join(tdir, n), w.get('branch') or 'team/' + n)
         w.update({'worktree': None, 'branch': None})
     remove_worktree(root, os.path.join(tdir, '_integration'))
-    for ref in R.git(['for-each-ref', '--format=%(refname)', 'refs/overmind/team'], root).splitlines():
+    for ref in R.git(['for-each-ref', '--format=%(refname)', 'refs/rubric/team'], root).splitlines():
         R.git(['update-ref', '-d', ref], root)
     if os.path.isdir(tdir) and not os.listdir(tdir):
         os.rmdir(tdir)

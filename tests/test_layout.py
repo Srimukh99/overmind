@@ -17,7 +17,7 @@ class Layout(unittest.TestCase):
         self.assertEqual(len(names), 14); self.assertFalse(names & {p.parent.name for p in (ROOT / 'skills').glob('*/SKILL.md')})
 
     def copy(self):
-        d = tempfile.mkdtemp(); shutil.copytree(ROOT, d + '/r', ignore=shutil.ignore_patterns('.git', '__pycache__', '.overmind'))
+        d = tempfile.mkdtemp(); shutil.copytree(ROOT, d + '/r', ignore=shutil.ignore_patterns('.git', '__pycache__', '.rubric'))
         self.addCleanup(shutil.rmtree, d); return pathlib.Path(d) / 'r'
     def test_detects_retired_name(self):
         r = self.copy(); p = r / 'skills' / 'delegate' / 'SKILL.md'; p.write_text(p.read_text() + '\nRun `hunt` first.\n')

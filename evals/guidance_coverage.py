@@ -26,7 +26,7 @@ import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OVERMIND = os.path.dirname(HERE)
+RUBRIC = os.path.dirname(HERE)
 DEFAULT_SP = os.path.expanduser(
     '~/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1')
 
@@ -102,7 +102,7 @@ EXTENDED = {
 
 # Where each library tells you how to write a test. Same role, both sides.
 LIBS = {
-    'overmind': [
+    'rubric': [
         'skills/build/SKILL.md',
         'skills/build/references/prove-it.md',
     ],
@@ -146,7 +146,7 @@ def real_defects():
     import code_quality as CQ
     failing = []
     for task_name, task in CQ.TASKS.items():
-        with tempfile.TemporaryDirectory(prefix='overmind-reach-') as d:
+        with tempfile.TemporaryDirectory(prefix='rubric-reach-') as d:
             CQ._suite(d, task['module'], task['thin'], task['hidden'])
             _, out = CQ._run(d)
             for line in out.splitlines():
@@ -210,7 +210,7 @@ def scan(root, files, classes=None):
 def main(argv=None):
     ap = argparse.ArgumentParser(prog='guidance-coverage')
     ap.add_argument('--lib', action='append', default=[],
-                    help='NAME=PATH, repeatable; defaults to overmind and superpowers')
+                    help='NAME=PATH, repeatable; defaults to rubric and superpowers')
     ap.add_argument('--quiet', action='store_true', help='scores only, no matched lines')
     a = ap.parse_args(argv)
 
@@ -219,15 +219,15 @@ def main(argv=None):
         n, _, p = spec.partition('=')
         libs[n] = p
     if not libs:
-        libs = {'overmind': OVERMIND, 'superpowers': DEFAULT_SP}
+        libs = {'rubric': RUBRIC, 'superpowers': DEFAULT_SP}
 
     results, ext_results = {}, {}
     for name, root in libs.items():
         if not os.path.isdir(root):
             print('%s: SKIPPED - not found at %s' % (name, root))
             continue
-        results[name] = scan(root, LIBS.get(name, LIBS['overmind']))
-        ext_results[name] = scan(root, LIBS.get(name, LIBS['overmind']), EXTENDED)
+        results[name] = scan(root, LIBS.get(name, LIBS['rubric']))
+        ext_results[name] = scan(root, LIBS.get(name, LIBS['rubric']), EXTENDED)
 
     if not results:
         print('no libraries to compare')

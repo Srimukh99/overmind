@@ -12,7 +12,7 @@ Resolve the backend, then query it.
 1. **Map the services** (once per repo):
    `python3 skills/debug/scripts/service_map.py .`
    Scans Terraform, CloudFormation, Kubernetes manifests and Compose files.
-   Writes `.overmind/services.json`: name, runtime, cloud, log group or selector,
+   Writes `.rubric/services.json`: name, runtime, cloud, log group or selector,
    IaC file and line, source path.
 
 2. **Fetch**:
@@ -29,7 +29,7 @@ Managed clusters (EKS, GKE, AKS) usually run a shipper: Fluent Bit, Fluentd,
 Vector, Promtail, Alloy or the CloudWatch agent. The shipper's config, not the
 cloud, says where pod logs land. `service_map.py` finds it, reads its output
 or sink blocks, and records `shipper`, `ships_to` and any log group in
-`.overmind/services.json`. That record is the debugging map: resolve it once,
+`.rubric/services.json`. That record is the debugging map: resolve it once,
 reuse it on every later incident. Shipper evidence beats every other signal.
 
 Cluster shippers cover pods only. ECS uses FireLens per task definition;

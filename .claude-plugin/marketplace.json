@@ -1,31 +1,31 @@
 {
-  "name": "overmind",
+  "name": "rubric",
   "owner": {
     "name": "Srimukh Yerneni"
   },
   "plugins": [
     {
-      "name": "overmind",
+      "name": "rubric",
       "source": "./",
       "description": "Core: 14 lean engineering skills for coding agents."
     },
     {
-      "name": "overmind-regulated",
+      "name": "rubric-regulated",
       "source": "./packs/regulated",
       "description": "Health data (HIPAA), card data (PCI DSS), money handling and audit trails for finance, healthcare and government work."
     },
     {
-      "name": "overmind-data",
+      "name": "rubric-data",
       "source": "./packs/data",
       "description": "Postgres, MongoDB, Snowflake and Databricks performance and safe schema changes."
     },
     {
-      "name": "overmind-k8s",
+      "name": "rubric-k8s",
       "source": "./packs/k8s",
       "description": "Kubernetes pod and rollout triage, git-versus-live drift checks, and CRD validation."
     },
     {
-      "name": "overmind-apis-agents",
+      "name": "rubric-apis-agents",
       "source": "./packs/apis-agents",
       "description": "API design (REST, GraphQL, gRPC) and tool design for AI agents and MCP servers."
     }

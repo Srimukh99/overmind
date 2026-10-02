@@ -36,7 +36,7 @@ class Team(unittest.TestCase):
     def two_workers(self):
         self.call('add', 'adder', '--owns', 'adder.py', '--target', 'tests/test_contract.py::test_add')
         self.call('add', 'multer', '--owns', 'multer.py', '--target', 'tests/test_contract.py::test_mul')
-    def plan(self): return json.load(open(os.path.join(self.d, '.overmind', 'team', 'plan.json')))
+    def plan(self): return json.load(open(os.path.join(self.d, '.rubric', 'team', 'plan.json')))
 
     def test_plan_ok(self):
         self.two_workers(); self.assertEqual(self.call('check')[0], 0)
@@ -63,7 +63,7 @@ class Team(unittest.TestCase):
         self.assertTrue(os.path.isdir(wa) and not wa.startswith(self.d + os.sep))
         self.w('adder.py', 'def add(a, b):\n    return a + b\n', wa)
         self.w('multer.py', 'def mul(a, b):\n    return a * b\n', wm); self.w('shared.py', 'X = 2\n', wm)
-        self.w('.overmind/result.json', '{"status": "done"}', wm)
+        self.w('.rubric/result.json', '{"status": "done"}', wm)
         rc, out = self.call('verify')
         self.assertIn('adder', out); self.assertRegex(out, r'adder\s+none\s+DONE'); self.assertRegex(out, r'multer\s+done\s+REJECT')
         self.assertIn('FALSE CLAIM', out)
@@ -88,14 +88,14 @@ class Team(unittest.TestCase):
         return p.stdout if p else ''
     def test_parallel_ratchets_keep_separate_refs(self):
         self.two_workers(); self.call('spawn', '--no-fast')
-        refs = self.git('for-each-ref', '--format=%(refname)', 'refs/overmind/ratchet').split()
+        refs = self.git('for-each-ref', '--format=%(refname)', 'refs/rubric/ratchet').split()
         self.assertEqual(len({r.split('/')[3] for r in refs}), 2)
     def test_clean_removes_worktrees_and_branches(self):
         self.two_workers(); self.call('spawn', '--no-fast'); self.call('clean', '--all')
         wl = self.git('worktree', 'list')
         br = self.git('branch', '--list', 'team/*')
         self.assertEqual(len(wl.strip().splitlines()), 1); self.assertEqual(br.strip(), '')
-        self.assertFalse(os.path.exists(os.path.join(self.d, '.overmind', 'team')))
+        self.assertFalse(os.path.exists(os.path.join(self.d, '.rubric', 'team')))
     def test_main_tree_untouched_until_apply(self):
         self.two_workers(); self.call('spawn', '--no-fast')
         wa = self.plan()['workers']['adder']['worktree']; self.w('adder.py', 'def add(a, b):\n    return a + b\n', wa)

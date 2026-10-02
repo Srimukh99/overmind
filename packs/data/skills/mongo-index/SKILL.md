@@ -11,7 +11,7 @@ description: Use when a MongoDB query or aggregation is slow, when explain shows
 
 - `totalDocsExamined` vs `nReturned`: far above 1:1 means wasted work.
 - A `COLLSCAN` stage on a large collection.
-- A bovermindg `SORT` stage (sorting in memory).
+- A brubricg `SORT` stage (sorting in memory).
 
 ## 2. Design the index (Equality, Sort, Range)
 

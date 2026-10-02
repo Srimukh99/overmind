@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.8.0
+- Renamed from overmind to **rubric**. Four separate projects over 500 stars
+  already shared the old name, including a 3,747-star Procfile manager. Project
+  state moves from `.overmind/` to `.rubric/`, checkpoints from
+  `refs/overmind/` to `refs/rubric/`, delegate worktrees from
+  `REPO.overmind-team/` to `REPO.rubric-team/`, and the Claude plugins from
+  `overmind*` to `rubric*`. Existing users: `git mv .overmind .rubric` and
+  `git update-ref` the ratchet refs, or start a fresh ratchet. `evals/v05_descriptions.json`
+  keeps the old name because it is a frozen baseline; routing is unaffected
+  (dev 98% top-1, legacy triggers 100%).
+- **`vibe_check.py` was a no-op outside this repo.** It pinned its scan target to
+  its own install directory, so running it from any project reported
+  `0 FAIL, 0 WARN, 0 lines scanned` and exit 0 without reading the staged diff.
+  It now takes `--repo` (default: the current directory). Two integration tests
+  that passed vacuously under the old behaviour now assert on scan output.
+- A leftover `breakpoint()` no longer stalls a runner. `loop.py`, `ratchet.py`
+  and `mutate.py` pass `PYTHONBREAKPOINT=0` to the child, so the suite reports
+  instead of blocking on pdb until the timeout. Measured: 600s default timeout
+  down to 0.1s on the reproduction. The gate still FAILs the leftover.
+- Always-loaded descriptions cut 25%, 912 to 683 tokens, while routing improved:
+  dev top-1 93% to 98%, top-3 98% to 100%, held-out 73% to 76%, legacy 100%.
+- The evals could not run on an Apple Silicon Mac with an x86_64 Python, because
+  git's xcrun shim cannot load into an x86 process. `evals/_eval_git.py` carries
+  the `arch -arm64` fallback the skill scripts already had. All five now run in CI.
+- New eval, `evals/code_quality.py`: three tasks with a visible suite and a
+  withheld acceptance suite. 6 of 6 candidates pass their own tests, 3 are wrong,
+  10 hidden defects would ship. It also found that **mutation score does not
+  predict correctness across implementations and here is anti-correlated** (thin
+  83%, solid 62%) - it measures whether a suite is real, not whether code is right.
+- New eval, `evals/guidance_coverage.py`: whether the advice given when tests are
+  written names the defect classes that actually ship. rubric 6/6 core, 2/4
+  extended, 10/10 defects reachable; superpowers 2/6, 1/4, 3/10.
+- `build/references/prove-it.md` gains a "Boundaries worth a test" table - nine
+  classes, each with the question to ask and the bug it catches - and `Done when`
+  requires it. It also states that `loop.py mutate` is not a substitute.
+
 ## 0.7.0
 - `service_map.py --okf` exports the service map as an Open Knowledge Format (OKF v0.1) bundle: one typed document per service, cluster and log shipper, linked, with `index.md` files and a newest-first `log.md`. Only generated files are rewritten or pruned. `okf.py check` validates any bundle. Clusters are now recorded as clusters, not services.
 - Installer: `--agent qwen` (Qwen Code) and `--agent cursor`; `all` now includes Qwen Code. README lists which agent reads which folder.

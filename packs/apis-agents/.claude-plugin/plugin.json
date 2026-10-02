@@ -1,5 +1,5 @@
 {
-  "name": "overmind-apis-agents",
+  "name": "rubric-apis-agents",
   "version": "0.7.0",
   "description": "API design (REST, GraphQL, gRPC) and tool design for AI agents and MCP servers.",
   "author": {

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build a service map from repo IaC: name -> runtime -> log location -> repo path.
 
-Written once per repo to .overmind/services.json, then reused. Later lookups cost
+Written once per repo to .rubric/services.json, then reused. Later lookups cost
 one file read instead of a repo-wide scan. Read-only; never contacts a cloud.
 """
 import json
@@ -9,7 +9,7 @@ import os
 import re
 import sys
 
-SKIP_DIRS = {'.overmind', '.git', 'node_modules', '.venv', 'venv', '__pycache__', 'dist',
+SKIP_DIRS = {'.rubric', '.git', 'node_modules', '.venv', 'venv', '__pycache__', 'dist',
              'build', '.terraform', 'vendor', '.mypy_cache', '.pytest_cache'}
 MAX_BYTES = 400000
 
@@ -383,7 +383,7 @@ def build(root):
 
 
 def save(root, data):
-    d = os.path.join(root, '.overmind')
+    d = os.path.join(root, '.rubric')
     os.makedirs(d, exist_ok=True)
     p = os.path.join(d, 'services.json')
     with open(p, 'w', encoding='utf-8') as fh:
@@ -392,7 +392,7 @@ def save(root, data):
 
 
 def load(root):
-    p = os.path.join(root, '.overmind', 'services.json')
+    p = os.path.join(root, '.rubric', 'services.json')
     if not os.path.exists(p):
         return None
     try:

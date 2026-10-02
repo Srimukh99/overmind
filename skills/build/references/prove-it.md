@@ -80,7 +80,7 @@ output says, and your best hypothesis. Don't try a fourth variation blind.
 
 ## Commands
 `loop.py` detects the stack (Python, Node, Go, Rust, Java). Override in
-`.overmind/loop.json`: `{"fast": ["..."], "focused": ["..."], "full": ["..."]}`.
+`.rubric/loop.json`: `{"fast": ["..."], "focused": ["..."], "full": ["..."]}`.
 `--dry-run` prints commands without running them.
 `tamper.py` compares test files against the merge-base with main. Mark a reviewed
 line with a `prove-it: ok` comment.

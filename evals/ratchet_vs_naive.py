@@ -8,9 +8,9 @@ import _eval_git as EG  # noqa: E402
 if not EG.require('pytest', 'ratchet vs naive'):
     sys.exit(0)
 
-OVERMIND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-WORK = tempfile.mkdtemp(prefix='overmind-eval-')
-R = os.path.join(OVERMIND, 'skills', 'ratchet', 'scripts', 'ratchet.py')
+RUBRIC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WORK = tempfile.mkdtemp(prefix='rubric-eval-')
+R = os.path.join(RUBRIC, 'skills', 'ratchet', 'scripts', 'ratchet.py')
 D = os.path.join(WORK, 'shop')
 shutil.rmtree(D, ignore_errors=True)
 def w(rel, text):
@@ -105,7 +105,7 @@ for label, files in ITERS:
     if verdict in ('REJECT', 'STALL'):
         before = EG.git(['status', '--porcelain'], cwd=D, check=False).stdout
         run('revert', '--clean')
-        floor_ck = re.search(r'"checkpoint": "(\w+)"', open(os.path.join(D, '.overmind/ratchet/floor.json')).read()).group(1)
+        floor_ck = re.search(r'"checkpoint": "(\w+)"', open(os.path.join(D, '.rubric/ratchet/floor.json')).read()).group(1)
         diff = subprocess.run([sys.executable, '-c', 'import sys; sys.path.insert(0, "%s"); import ratchet as r; print(len(r.diff_vs("%s", "%s", ["--name-only"]).split()))' % (os.path.dirname(R), D, floor_ck)], capture_output=True, text=True).stdout.strip()
         restored = diff == '0'
     else:

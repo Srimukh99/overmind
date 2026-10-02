@@ -27,7 +27,7 @@ def hits(text, classes=None):
         open(os.path.join(d, 'skills', 'build', 'SKILL.md'), 'w').close()
         with open(os.path.join(d, 'skills', 'build', 'references', 'prove-it.md'), 'w') as fh:
             fh.write(text)
-        found = GC.scan(d, GC.LIBS['overmind'], classes)
+        found = GC.scan(d, GC.LIBS['rubric'], classes)
     return {k for k, v in found.items() if v}
 
 
@@ -65,10 +65,10 @@ class AcceptsRealGuidance(unittest.TestCase):
         self.assertIn('numeric_type', hits('| Numeric type | Which way does it round? Money in integer cents? |\n'))
 
 
-class OvermindCoversTheCoreClasses(unittest.TestCase):
+class RubricCoversTheCoreClasses(unittest.TestCase):
     def test_prove_it_names_every_core_class(self):
         """Regression guard: prove-it.md's boundary table must not be thinned out."""
-        found = GC.scan(ROOT, GC.LIBS['overmind'])
+        found = GC.scan(ROOT, GC.LIBS['rubric'])
         missing = [c for c in GC.CLASSES if not found[c]]
         self.assertEqual(missing, [], 'prove-it.md stopped naming: %s' % missing)
 
@@ -90,9 +90,9 @@ class ReachabilityMappingIsCurrent(unittest.TestCase):
         unknown = sorted({c for c in GC.DEFECT_CLASS.values() if c not in GC.CLASSES})
         self.assertEqual(unknown, [], 'mapping references unknown classes: %s' % unknown)
 
-    def test_overmind_guidance_reaches_every_measured_defect(self):
+    def test_rubric_guidance_reaches_every_measured_defect(self):
         """Regression guard for the boundary table's practical coverage."""
-        found = GC.scan(ROOT, GC.LIBS['overmind'])
+        found = GC.scan(ROOT, GC.LIBS['rubric'])
         failing = GC.real_defects()
         missed = sorted({GC.DEFECT_CLASS[n] for _, n in failing
                          if not found.get(GC.DEFECT_CLASS[n])})

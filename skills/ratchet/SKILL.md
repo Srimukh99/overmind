@@ -44,7 +44,7 @@ measurably improved. Bad steps cost one revert, not a debugging session.
 - **quality**: lint or typecheck went from clean to failing, or the mutation score fell.
 
 ## Never
-- Edit `.overmind/ratchet/` files, or restart the ratchet to escape a REJECT.
+- Edit `.rubric/ratchet/` files, or restart the ratchet to escape a REJECT.
 - Fix a regression by editing the test that caught it.
 - Widen scope, allow an API change or unfreeze a test on your own. Ask the user, then:
   `ratchet.py amend --scope 'src/billing/**' --reason "user approved: ..."`
@@ -52,7 +52,7 @@ measurably improved. Bad steps cost one revert, not a debugging session.
 
 ## Other commands
 `ratchet.py status` shows the iteration history. `revert --clean` also removes files
-created since the checkpoint. Checkpoints are git objects under `refs/overmind/ratchet/`;
+created since the checkpoint. Checkpoints are git objects under `refs/rubric/ratchet/`;
 your branch, index and commits are never touched. Override the test command with
-`--test-cmd` (anything that writes JUnit XML to `.overmind/ratchet/junit.xml` works).
-Add `.overmind/ratchet/` to `.gitignore`.
+`--test-cmd` (anything that writes JUnit XML to `.rubric/ratchet/junit.xml` works).
+Add `.rubric/ratchet/` to `.gitignore`.

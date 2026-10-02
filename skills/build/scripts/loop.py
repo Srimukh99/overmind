@@ -5,7 +5,7 @@
   focused  tests related to changes     (when green)
   full     whole suite                  (before done)
 
-Stack is detected from the repo. Override with .overmind/loop.json.
+Stack is detected from the repo. Override with .rubric/loop.json.
 """
 import argparse, json, os, re, shutil, subprocess, sys, time
 
@@ -50,7 +50,7 @@ def git(args, cwd):
 
 def changed_files(root):
     out = git(['diff', '--name-only', 'HEAD'], root) + git(['ls-files', '--others', '--exclude-standard'], root)
-    junk = re.compile(r'__pycache__|\.pyc$|(^|/)(node_modules|\.overmind|target|dist|build)/')
+    junk = re.compile(r'__pycache__|\.pyc$|(^|/)(node_modules|\.rubric|target|dist|build)/')
     return sorted({f for f in out.split() if os.path.exists(os.path.join(root, f)) and not junk.search(f)})
 
 
@@ -158,7 +158,7 @@ def java_plan(root, changed):
 
 
 def plan(root, changed):
-    over = read(root, os.path.join('.overmind', 'loop.json'))
+    over = read(root, os.path.join('.rubric', 'loop.json'))
     if over:
         try:
             o = json.loads(over)
@@ -291,7 +291,7 @@ def main(argv=None):
     note = '' if a.tier != 'focused' or focused else '  (no related tests found; running full)'
     print('loop %s: %s stack, %d changed file(s)%s' % (a.tier, stack, len(changed), note))
     if not cmds:
-        print('no %s commands detected; add them to .overmind/loop.json' % a.tier)
+        print('no %s commands detected; add them to .rubric/loop.json' % a.tier)
         return 2
     if a.dry_run:
         for c in cmds:

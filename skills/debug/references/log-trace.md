@@ -8,7 +8,7 @@ Let the script read the log, not you. It returns a 15–25 line summary, so a 5,
    - From a command: `kubectl logs <pod> --previous | python3 <this skill folder>/scripts/log_trace.py --repo .`
    - Other sources: `aws logs tail <group> --since 30m | ...`, `docker logs <id> 2>&1 | ...`
    - From a file: `python3 <this skill folder>/scripts/log_trace.py error.log --repo .`
-   - Only if the user pasted it: write it to `/tmp/overmind.log` once, then run on that file.
+   - Only if the user pasted it: write it to `/tmp/rubric.log` once, then run on that file.
 2. Read the summary:
    - **error / category**: what failed (timeout, out-of-memory, auth, config/missing, ...).
    - **runtime**: Lambda, ECS, Kubernetes (EKS/AKS/GKE), EC2, Cloud Run, with evidence from the log and from the repo's IaC.

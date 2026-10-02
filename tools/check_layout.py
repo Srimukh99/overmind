@@ -17,7 +17,7 @@ RETIRED = {"shape", "blueprint", "prove-it", "sandbox", "hunt", "trace-back", "s
 GATES = {"vibe-check": ("ship", "vibe-check"), "log-trace": ("debug", "log-trace"),
          "log-fetch": ("debug", "log-fetch")}
 TEXT = (".md", ".yml", ".yaml", ".sh", ".json")
-SKIP_DIRS = {".git", "__pycache__", ".overmind"}
+SKIP_DIRS = {".git", "__pycache__", ".rubric"}
 UPGRADE = re.compile(r"<!-- upgrade:start -->.*?<!-- upgrade:end -->", re.S)
 
 

@@ -9,7 +9,7 @@ Read only the part you need.
 
 | Situation | Read |
 | --- | --- |
-| About to commit, push or open a PR, or when asked whether code is safe to ship. Runs the overmind quality and compliance gate on the changes and the project's own checks. | `references/vibe-check.md` |
+| About to commit, push or open a PR, or when asked whether code is safe to ship. Runs the rubric quality and compliance gate on the changes and the project's own checks. | `references/vibe-check.md` |
 | About to say work is done, fixed, passing, deployed, faster or ready, and before any commit, PR or status update. Requires proof from commands run in this session. | `references/receipts.md` |
 | All tasks are done and the work is ready to merge, open as a PR, or throw away. Finishes the branch cleanly. | `references/land.md` |
 | About to deploy or release to production, including database migrations, config changes, feature flag flips and infrastructure changes. Confirms the change is safe to ship and can be rolled back. | `references/preflight.md` |

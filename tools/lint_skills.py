@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lint overmind skills against the open Agent Skills format and overmind's own rules.
+"""Lint rubric skills against the open Agent Skills format and rubric's own rules.
 
 Core skills live in skills/, optional packs in packs/NAME/skills/. A skill may keep
 long material in references/*.md, linked from a table in its SKILL.md.

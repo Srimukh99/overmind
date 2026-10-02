@@ -1,5 +1,5 @@
 {
-  "name": "overmind-k8s",
+  "name": "rubric-k8s",
   "version": "0.7.0",
   "description": "Kubernetes pod and rollout triage, git-versus-live drift checks, and CRD validation.",
   "author": {

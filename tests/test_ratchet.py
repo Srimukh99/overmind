@@ -41,7 +41,7 @@ class Ratchet(unittest.TestCase):
         rc, out = self.call('check'); return out.split('\n')[0].split(': ')[1], out
 
     def test_floor_counts_existing_tests(self):
-        floor = json.load(open(os.path.join(self.d, '.overmind/ratchet/floor.json')))
+        floor = json.load(open(os.path.join(self.d, '.rubric/ratchet/floor.json')))
         self.assertEqual(len(floor['passing']), 2); self.assertEqual(floor['targets'], {'tests/test_new.py::test_b': False})
     def test_done_on_good_change(self):
         self.w('shop.py', GOOD); self.assertEqual(self.verdict()[0], 'DONE')

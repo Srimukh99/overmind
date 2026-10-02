@@ -4,9 +4,9 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _eval_git as EG  # noqa: E402
 
-OVERMIND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-WORK = tempfile.mkdtemp(prefix='overmind-eval-')
-TAMPER = os.path.join(OVERMIND, 'skills', 'build', 'scripts', 'tamper.py')
+RUBRIC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WORK = tempfile.mkdtemp(prefix='rubric-eval-')
+TAMPER = os.path.join(RUBRIC, 'skills', 'build', 'scripts', 'tamper.py')
 PY = '''import unittest
 from cart import total, apply_coupon
 

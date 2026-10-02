@@ -1,5 +1,5 @@
 {
-  "name": "overmind-data",
+  "name": "rubric-data",
   "version": "0.7.0",
   "description": "Postgres, MongoDB, Snowflake and Databricks performance and safe schema changes.",
   "author": {

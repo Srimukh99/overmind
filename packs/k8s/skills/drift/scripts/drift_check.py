@@ -6,7 +6,7 @@ Read-only: runs only plan/diff/get commands. Skips tools that aren't installed.
 
   python3 drift_check.py                   # auto-detect everything
   python3 drift_check.py --k8s-dir deploy/ --namespace prod
-  python3 drift_check.py --history         # past results from .overmind/state.jsonl
+  python3 drift_check.py --history         # past results from .rubric/state.jsonl
 """
 import argparse
 import datetime
@@ -18,7 +18,7 @@ import shutil
 import subprocess
 import sys
 
-STATE_FILE = os.path.join(".overmind", "state.jsonl")
+STATE_FILE = os.path.join(".rubric", "state.jsonl")
 
 
 def run(cmd, cwd=None, timeout=600):
@@ -208,7 +208,7 @@ def git_sha():
 
 
 def record(results):
-    os.makedirs(".overmind", exist_ok=True)
+    os.makedirs(".rubric", exist_ok=True)
     entry = {"at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), "desired_ref": git_sha(),
              "drift": [r["source"] for r in results if r["status"] == "drift"],
              "skipped": [r["source"] for r in results if r["status"] == "skipped"]}

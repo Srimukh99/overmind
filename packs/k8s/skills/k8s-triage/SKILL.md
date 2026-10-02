@@ -15,7 +15,7 @@ Start broad and cheap: run the `drift` skill's script with `-n <ns> --no-tf`. It
 | Pending | `describe pod` events (FailedScheduling) | Requests bigger than any node, node selector or taint mismatch, PVC not bound |
 | Running but not Ready | Readiness probe config; app health endpoint | Probe path or port wrong, dependency down, slow start without a startup probe |
 | 502/503 from ingress | `kubectl get endpoints <svc>`; Service selector vs pod labels | No ready endpoints, wrong targetPort, label mismatch |
-| Rollout stuck | `kubectl rollout status`; ReplicaSet events | New pods failing (see rows above), quota, PodDisruptionBudget bovermindg |
+| Rollout stuck | `kubectl rollout status`; ReplicaSet events | New pods failing (see rows above), quota, PodDisruptionBudget brubricg |
 | CreateContainerConfigError | `describe pod` | Referenced ConfigMap or Secret key missing |
 
 ## Rules

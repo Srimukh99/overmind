@@ -27,10 +27,10 @@ A line that is a deliberate false positive can carry `vibe-check: ignore` in a c
 
 ## Add your own checks
 
-List extra commands, one per line, in `.overmind/checks`. Each runs on every vibe-check, in the repo root, and fails the gate on a non-zero exit. These are shell commands from the repo, so treat `.overmind/checks` as code: read it before running the gate in a repo you don't control. For example:
+List extra commands, one per line, in `.rubric/checks`. Each runs on every vibe-check, in the repo root, and fails the gate on a non-zero exit. These are shell commands from the repo, so treat `.rubric/checks` as code: read it before running the gate in a repo you don't control. For example:
 
 ```text
-# .overmind/checks
+# .rubric/checks
 ruff format --check .
 gitleaks protect --staged --no-banner
 python3 <iac-check skill folder>/scripts/iac_check.py infra/ deploy/
@@ -39,6 +39,6 @@ python3 <iac-check skill folder>/scripts/iac_check.py infra/ deploy/
 ## Make it automatic
 
 - Commit hook: `python3 <this skill folder>/scripts/vibe_check.py --install-hook` (won't overwrite an existing hook).
-- CI: see `.github/workflows/ci.yml` in the overmind repo for a ready job.
+- CI: see `.github/workflows/ci.yml` in the rubric repo for a ready job.
 
 Never bypass commit hooks (`--no-verify`) unless the user explicitly asks.

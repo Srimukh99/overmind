@@ -3,7 +3,7 @@
 summarise the result.
 
 Flow:
-  1. load or build the service map (.overmind/services.json)
+  1. load or build the service map (.rubric/services.json)
   2. resolve the service name (exact, then fuzzy)
   3. rank backends from repo signals + environment; aggregators win ties
   4. build a query for the chosen backend

@@ -34,7 +34,7 @@ brief yourself.
 ## Rules
 
 - Every file has at most one owner. Workers may add new test files; they never edit existing tests.
-- Briefs and returns stay short: the worker replies in five lines and writes `.overmind/result.json`.
+- Briefs and returns stay short: the worker replies in five lines and writes `.rubric/result.json`.
 - Judge workers by `verify`, never by their summary.
 - If your agent lets you pick models, mechanical worker tasks can use a cheaper one; keep planning and
   integration on the strongest.

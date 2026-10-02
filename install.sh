@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# overmind installer: copies the core skills, plus any packs you choose, into each coding agent's skills folder.
+# rubric installer: copies the core skills, plus any packs you choose, into each coding agent's skills folder.
 # Usage: ./install.sh [--agent claude|codex|kiro|qwen|cursor|all] [--scope project|user] [--target DIR] [--pack NAME[,NAME]|all]
 # Packs: regulated, data, k8s, apis-agents
 set -euo pipefail
@@ -75,12 +75,12 @@ fi
 # Codex and other AGENTS.md readers: add a one-line pointer to the boot skill.
 if [[ "$SCOPE" == "project" && ( "$AGENT" == "all" || "$AGENT" == "codex" ) ]]; then
   AGENTS_FILE="$TARGET/AGENTS.md"
-  if ! grep -q "overmind:boot" "$AGENTS_FILE" 2>/dev/null; then
-    printf '\n<!-- overmind:boot -->\nBefore any task, use the `boot` skill to pick the right overmind skill. Run `vibe-check` before every commit.\n' >> "$AGENTS_FILE"
-    echo "✓ Added overmind pointer to $AGENTS_FILE"
+  if ! grep -q "rubric:boot" "$AGENTS_FILE" 2>/dev/null; then
+    printf '\n<!-- rubric:boot -->\nBefore any task, use the `boot` skill to pick the right rubric skill. Run `vibe-check` before every commit.\n' >> "$AGENTS_FILE"
+    echo "✓ Added rubric pointer to $AGENTS_FILE"
   fi
 fi
 
 echo
 [[ -z "$PACKS" ]] && echo "Packs are optional: re-run with --pack regulated,data,k8s,apis-agents (or --pack all)."
-echo "Cursor, GitHub Copilot, Gemini CLI and others: run  npx skills add Srimukh99/overmind"
+echo "Cursor, GitHub Copilot, Gemini CLI and others: run  npx skills add Srimukh99/rubric"

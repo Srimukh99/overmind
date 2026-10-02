@@ -195,8 +195,8 @@ def project_checks(root):
     return results
 
 
-def extra_checks(root, rel=os.path.join(".overmind", "checks")):
-    """Run extra commands listed one per line in .overmind/checks (comments with #)."""
+def extra_checks(root, rel=os.path.join(".rubric", "checks")):
+    """Run extra commands listed one per line in .rubric/checks (comments with #)."""
     path = os.path.join(root, rel)
     if not os.path.isfile(path):
         return []
@@ -229,14 +229,14 @@ def install_hook(root):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="overmind quality and compliance gate")
+    ap = argparse.ArgumentParser(description="rubric quality and compliance gate")
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--all", action="store_true", help="scan every tracked file")
     g.add_argument("--range", help="scan a git range, e.g. origin/main...HEAD")
     ap.add_argument("--repo", default=".", help="repo to check (default: .)")
     ap.add_argument("--full", action="store_true", help="also run the project's lint/type/test commands")
     ap.add_argument("--install-hook", action="store_true", help="run vibe-check on every commit")
-    # Extra commands (formatters, gitleaks, iac-check, ...) can be listed in .overmind/checks
+    # Extra commands (formatters, gitleaks, iac-check, ...) can be listed in .rubric/checks
     args = ap.parse_args(argv)
     root = os.path.abspath(args.repo)
 

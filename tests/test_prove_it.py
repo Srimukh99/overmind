@@ -72,7 +72,7 @@ class Loop(unittest.TestCase):
         _, fast, focused, full = L.plan(self.d, ['api/h.go'])
         self.assertEqual(focused, ['go test ./api']); self.assertEqual(full, ['go test ./...'])
     def test_override(self):
-        self.w('.overmind/loop.json', '{"fast":["make lint"],"full":["make test"]}')
+        self.w('.rubric/loop.json', '{"fast":["make lint"],"full":["make test"]}')
         self.assertEqual(L.plan(self.d, [])[:2], ('custom', ['make lint']))
     def test_digest_keeps_signal(self):
         out = '\n'.join(['noise'] * 200 + ['tests/a.py:12: AssertionError: 3 != 4', 'FAILED (failures=1)'])

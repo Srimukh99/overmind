@@ -22,12 +22,12 @@ import json, os, re, shutil, subprocess, sys, tempfile, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _eval_git as EG  # noqa: E402
 
-OVERMIND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEAM = os.path.join(OVERMIND, 'skills', 'delegate', 'scripts', 'team.py')
-sys.path.insert(0, os.path.join(OVERMIND, 'skills', 'ratchet', 'scripts'))
+RUBRIC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TEAM = os.path.join(RUBRIC, 'skills', 'delegate', 'scripts', 'team.py')
+sys.path.insert(0, os.path.join(RUBRIC, 'skills', 'ratchet', 'scripts'))
 import ratchet as R  # noqa: E402
 
-WORK = tempfile.mkdtemp(prefix='overmind-deleg-')
+WORK = tempfile.mkdtemp(prefix='rubric-deleg-')
 
 BASE = {
     'pyproject.toml': '[tool.pytest.ini_options]\npythonpath = ["src"]\n',
@@ -83,7 +83,7 @@ def fresh(name):
 
 
 def results(root):
-    shutil.rmtree(os.path.join(root, '.overmind', 'ratchet'), ignore_errors=True)
+    shutil.rmtree(os.path.join(root, '.rubric', 'ratchet'), ignore_errors=True)
     return R.run_tests(root, R.detect_test_cmd(root))[1]
 
 
@@ -94,7 +94,7 @@ def passing(res, tid):
 def truth(root):
     """Score the final code against the ORIGINAL contract and the original helper test."""
     probe = os.path.join(WORK, 'truth'); shutil.rmtree(probe, ignore_errors=True)
-    shutil.copytree(root, probe, ignore=shutil.ignore_patterns('.git', '.overmind', '__pycache__', '.pytest_cache'))
+    shutil.copytree(root, probe, ignore=shutil.ignore_patterns('.git', '.rubric', '__pycache__', '.pytest_cache'))
     write(probe, CONTRACT); write(probe, {'tests/test_util.py': BASE['tests/test_util.py']})
     res = results(probe)
     ids = [t for v in TARGETS.values() for t in v] + ['tests/test_util.py::test_round_cents']
@@ -171,10 +171,10 @@ def run_team(log):
     rc, out = team(main, 'brief', 'shipping'); log.append(('brief sent to the shipping worker', out))
 
     def work(wave, names):
-        plan = json.load(open(os.path.join(main, '.overmind', 'team', 'plan.json')))
+        plan = json.load(open(os.path.join(main, '.rubric', 'team', 'plan.json')))
         for w in names:
             wt = plan['workers'][w]['worktree']
-            write(wt, wave[w]); write(wt, {'.overmind/result.json': json.dumps({'status': 'done', 'summary': 'implemented ' + w})})
+            write(wt, wave[w]); write(wt, {'.rubric/result.json': json.dumps({'status': 'done', 'summary': 'implemented ' + w})})
 
     t0 = time.time(); rc, out = team(main, 'spawn', '--no-fast'); timings['spawn'] = time.time() - t0; log.append(('spawn wave 1', out))
     work(WAVE1, ['pricing', 'tax', 'shipping', 'receipt'])
@@ -216,7 +216,7 @@ def main():
     print('old delegate ran the full suite %d times, one after another' % old['suite_runs'])
     shutil.rmtree(WORK, ignore_errors=True)
     for d in os.listdir(os.path.dirname(WORK)):
-        if d.startswith('team.overmind-team'):
+        if d.startswith('team.rubric-team'):
             shutil.rmtree(os.path.join(os.path.dirname(WORK), d), ignore_errors=True)
 
 

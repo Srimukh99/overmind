@@ -1,6 +1,6 @@
 ---
 name: forge
-description: Use when creating a new overmind skill or editing an existing one.
+description: Use when creating a new rubric skill or editing an existing one.
 ---
 
 # forge

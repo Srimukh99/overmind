@@ -29,4 +29,4 @@ description: Use when writing or reviewing Terraform, CloudFormation, Kubernetes
 - One role per workload (IRSA, ECS task roles, Lambda execution roles), scoped to its own resources.
 - Regulated data stores also follow `reg-phi` or `reg-pci`.
 
-Add `python3 <this skill folder>/scripts/iac_check.py` to `.overmind/checks` so `vibe-check` runs it on every commit.
+Add `python3 <this skill folder>/scripts/iac_check.py` to `.rubric/checks` so `vibe-check` runs it on every commit.

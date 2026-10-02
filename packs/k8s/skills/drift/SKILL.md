@@ -16,7 +16,7 @@ Desired state is git: Terraform, manifests, Helm values, GitOps apps. Current st
    - **rollouts**: desired vs updated vs ready replicas, stuck rollouts, and specs the controller hasn't observed yet.
    - **pods**: crash loops, image pull errors, OOM kills, unschedulable pods.
    - **gitops / helm**: Argo CD apps not synced or healthy, Flux not ready, failed Helm releases.
-3. Every run is appended to `.overmind/state.jsonl` (commit SHA, what drifted). Run `--history` to see when drift first appeared.
+3. Every run is appended to `.rubric/state.jsonl` (commit SHA, what drifted). Run `--history` to see when drift first appeared.
 
 ## Correcting drift
 

@@ -8,29 +8,29 @@ or drifting from the goal. Turns one way only.
   amend   widen scope or allow an API change, with a recorded reason
   status  iteration history
 
-State lives in .overmind/ratchet/. Checkpoints are git objects under
-refs/overmind/ratchet/ - your branch, index and history are never touched.
+State lives in .rubric/ratchet/. Checkpoints are git objects under
+refs/rubric/ratchet/ - your branch, index and history are never touched.
 """
 import argparse, fnmatch, glob, hashlib, json, os, re, subprocess, sys, tempfile, time
 import xml.etree.ElementTree as ET
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROVE = os.path.join(os.path.dirname(os.path.dirname(HERE)), 'build', 'scripts')
-STATE = os.path.join('.overmind', 'ratchet')
+STATE = os.path.join('.rubric', 'ratchet')
 MANIFESTS = re.compile(r'(^|/)(package\.json|requirements[^/]*\.txt|pyproject\.toml|setup\.(py|cfg)|go\.mod|'
                        r'Cargo\.toml|pom\.xml|build\.gradle(\.kts)?|Gemfile|composer\.json)$')
 TEST_PATH = re.compile(r'(^|/)(tests?|__tests__|spec)/|(^|/)test_[^/]+\.py$|_test\.(py|go)$|'
                        r'\.(test|spec)\.[jt]sx?$|Tests?\.(java|kt)$')
-SKIP_DIRS = {'.git', 'node_modules', '.venv', 'venv', '__pycache__', 'dist', 'build', '.overmind', 'vendor', 'target'}
+SKIP_DIRS = {'.git', 'node_modules', '.venv', 'venv', '__pycache__', 'dist', 'build', '.rubric', 'vendor', 'target'}
 MAX_STRIKES = 3
 JUNK = [':(exclude,glob)**/__pycache__/**', ':(exclude,glob)**/*.pyc', ':(exclude,glob)**/.pytest_cache/**',
         ':(exclude,glob)**/node_modules/**', ':(exclude,glob)**/.DS_Store', ':(exclude,glob)**/coverage/**',
-        ':(exclude,glob)**/*.egg-info/**', ':(exclude,glob).overmind/**']
+        ':(exclude,glob)**/*.egg-info/**', ':(exclude,glob).rubric/**']
 
 
 # ------------------------------------------------------------------ helpers
 def git(args, cwd, env=None, check=False, strip=True):
-    base_cmd = ['git', '-c', 'user.name=overmind', '-c', 'user.email=overmind@local'] + args
+    base_cmd = ['git', '-c', 'user.name=rubric', '-c', 'user.email=rubric@local'] + args
     p = None
     try:
         p = subprocess.run(base_cmd, cwd=cwd, capture_output=True, text=True, env=env)
@@ -54,7 +54,7 @@ def git(args, cwd, env=None, check=False, strip=True):
 
 
 def git_bytes(args, cwd, env=None):
-    base_cmd = ['git', '-c', 'user.name=overmind', '-c', 'user.email=overmind@local'] + args
+    base_cmd = ['git', '-c', 'user.name=rubric', '-c', 'user.email=rubric@local'] + args
     p = None
     try:
         p = subprocess.run(base_cmd, cwd=cwd, capture_output=True, env=env)
@@ -110,20 +110,20 @@ def history(root):
 
 # ------------------------------------------------------------------ checkpoints
 def checkpoint(root, n):
-    """Snapshot the working tree (incl. untracked, minus ignored and .overmind) without touching the index."""
-    fd, idx = tempfile.mkstemp(prefix='overmind-idx-'); os.close(fd); os.unlink(idx)
+    """Snapshot the working tree (incl. untracked, minus ignored and .rubric) without touching the index."""
+    fd, idx = tempfile.mkstemp(prefix='rubric-idx-'); os.close(fd); os.unlink(idx)
     env = dict(os.environ, GIT_INDEX_FILE=idx)
     try:
         head = git(['rev-parse', '--verify', '-q', 'HEAD'], root)
         if head:
             git(['read-tree', 'HEAD'], root, env)
         git(['add', '-A', '--', '.'] + JUNK, root, env, check=True)
-        git(['rm', '-r', '-q', '--cached', '--ignore-unmatch', '.overmind'], root, env)
+        git(['rm', '-r', '-q', '--cached', '--ignore-unmatch', '.rubric'], root, env)
         tree = git(['write-tree'], root, env, check=True)
         commit = git(['commit-tree', tree, '-m', 'ratchet %d' % n] + (['-p', head] if head else []), root, check=True)
         # one namespace per working folder: worktrees share refs, so parallel ratchets must not collide
         space = hashlib.sha1(os.path.realpath(root).encode()).hexdigest()[:10]
-        git(['update-ref', 'refs/overmind/ratchet/%s/%d' % (space, n), commit], root, check=True)
+        git(['update-ref', 'refs/rubric/ratchet/%s/%d' % (space, n), commit], root, check=True)
         return commit
     finally:
         if os.path.exists(idx):
@@ -137,7 +137,7 @@ def tree_files(root, commit):
 def current_files(root):
     out = git(['ls-files', '--cached', '--others', '--exclude-standard'], root).splitlines()
     junk = re.compile(r'(^|/)(__pycache__|\.pytest_cache|node_modules|coverage)/|\.pyc$|\.DS_Store$|\.egg-info/')
-    return {f for f in out if not f.startswith('.overmind/') and not junk.search(f) and os.path.exists(os.path.join(root, f))}
+    return {f for f in out if not f.startswith('.rubric/') and not junk.search(f) and os.path.exists(os.path.join(root, f))}
 
 
 # ------------------------------------------------------------------ test results
@@ -333,7 +333,7 @@ def measure(root, anchor):
 def changed_since(root, base):
     files = set(git(['diff', '--name-only', base], root).splitlines()) if base else set()
     files |= set(git(['ls-files', '--others', '--exclude-standard'], root).splitlines())
-    return {f for f in files if f and not f.startswith('.overmind/')}
+    return {f for f in files if f and not f.startswith('.rubric/')}
 
 
 def in_scope(f, scope):
@@ -341,13 +341,13 @@ def in_scope(f, scope):
 
 
 def diff_vs(root, commit, args):
-    """git diff of the current working tree (incl. untracked, minus .overmind) against a snapshot."""
-    fd, idx = tempfile.mkstemp(prefix='overmind-idx-'); os.close(fd); os.unlink(idx)
+    """git diff of the current working tree (incl. untracked, minus .rubric) against a snapshot."""
+    fd, idx = tempfile.mkstemp(prefix='rubric-idx-'); os.close(fd); os.unlink(idx)
     env = dict(os.environ, GIT_INDEX_FILE=idx)
     try:
         git(['read-tree', commit], root, env)
         git(['add', '-A', '--', '.'] + JUNK, root, env)
-        git(['rm', '-r', '-q', '--cached', '--ignore-unmatch', '.overmind'], root, env)
+        git(['rm', '-r', '-q', '--cached', '--ignore-unmatch', '.rubric'], root, env)
         return git(['diff', '--cached', '--no-color'] + args + [commit], root, env, strip=False)
     finally:
         if os.path.exists(idx):

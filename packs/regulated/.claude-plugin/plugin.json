@@ -1,5 +1,5 @@
 {
-  "name": "overmind-regulated",
+  "name": "rubric-regulated",
   "version": "0.7.0",
   "description": "Health data (HIPAA), card data (PCI DSS), money handling and audit trails for finance, healthcare and government work.",
   "author": {

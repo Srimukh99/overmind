@@ -2,6 +2,6 @@ __pycache__/
 *.pyc
 .worktrees/
 .env
-.overmind/state.jsonl
-.overmind/services.json
+.rubric/state.jsonl
+.rubric/services.json
 .DS_Store
