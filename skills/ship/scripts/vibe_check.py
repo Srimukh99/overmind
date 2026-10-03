@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 """vibe-check: a fast, dependency-free quality and compliance gate.
 
-Scans added lines (staged, a git range, or the whole repo) for secrets,
-regulated identifiers, debug leftovers and conflict markers. Exit code 1 on FAIL.
+Scans added lines (staged, uncommitted, a git range, or the whole repo) for
+secrets, regulated identifiers, debug leftovers and conflict markers. Exit code
+1 on FAIL.
 
 Checks the repo given by --repo, defaulting to the current directory, so the
 gate works from any project without being installed into it.
+
+--stop-hook runs it as an agent Stop hook: it scans the uncommitted work, reads
+the agent's closing message for wording that predicts instead of proves ("should
+work", "I'm confident") and for success it reports with no passing check run
+after the last edit, prints to stderr so the findings reach the agent, and exits
+2 to send the turn back instead of letting it end on an unproven claim.
 """
 import argparse
 import json
@@ -19,6 +26,94 @@ import sys
 IGNORE_MARK = "vibe-check: ignore"
 MAX_BYTES = 5 * 1024 * 1024
 GIT_TIMEOUT = 120
+STOP_HOOK_TIMEOUT = 600
+STOP_REASON = (
+    "vibe-check failed, so this work is not provably done. Fix every FAIL above, "
+    "re-run the gate, and report the result as a receipt (command -> key output "
+    "line). A closing message that predicts (\"should work\", \"I'm confident\") "
+    "needs the command run and its output quoted instead. If a check cannot be run "
+    "here, say \"unverified\" and why rather than claiming it passed."
+)
+# Wording that predicts a result instead of reporting one. The same list, in the
+# same order, is in references/receipts.md; tests/test_vibe_check.py keeps them equal.
+RED_FLAGS = [
+    "should work", "should be fine", "looks right", "looks correct", "I think it works",
+    "I think it's fixed", "probably", "must be working", "seems to work",
+    "basically done", "mostly working", "in theory", "by inspection",
+    "obviously correct", "simple enough that", "I'm confident",
+]
+APOSTROPHES = str.maketrans({"\u2019": "'", "\u2018": "'"})
+RED_FLAG_RX = re.compile(r"(?<![\w'])(%s)(?![\w'])" % "|".join(re.escape(f) for f in RED_FLAGS), re.I)
+# A sentence that reports success. Each one needs a passing check behind it, run
+# after the last edit, whatever words it uses.
+SUCCESS_RX = re.compile(
+    r"\b(?:all\s+)?(?:\d+\s+)?(?:tests?|specs?|suite|checks?|build|lint(?:er)?|type.?check(?:s|er)?|ci)\b"
+    r"[^.\n]{0,30}?\b(?:pass(?:es|ed|ing)?|green|succeed(?:s|ed)?|clean|ok)\b"
+    r"|\b(?:is|are|it's|it is|now|all|everything(?:'s| is)?)\s+(?:done|fixed|working|complete|resolved|good|green|set)\b"
+    r"|\b(?:it|this|that|everything)\s+works\b|\bworks\s+(?:now|fine|correctly|as expected)\b"
+    r"|\bready\s+(?:to|for)\s+(?:merge|ship|review|deploy)\b"
+    r"|(?:^|\n)\s*(?:done|fixed|all set|all good|perfect|great|success)\s*[!.]",
+    re.I)
+# Commands that check something. Broad on purpose: the question is whether
+# anything was checked after the last edit, not which runner was right.
+CHECK_CMD = re.compile(
+    r"\b(?:pytest|unittest|tox|nox|jest|vitest|mocha|rspec|phpunit|ctest|tsc|eslint|ruff|flake8|mypy|"
+    r"pyright|pylint|gradlew?|mvn|vibe_check\.py|loop\.py|curl|"
+    r"(?:npm|pnpm|yarn)\s+(?:run\s+)?(?:test|lint|build|check|typecheck)|"
+    r"go\s+(?:test|vet|build)|cargo\s+(?:test|build|check|clippy)|dotnet\s+(?:test|build)|"
+    r"bazel\s+(?:test|build)|swift\s+(?:test|build)|make)\b"
+    r"|\bpython[\d.]*\s+(?:-m\s+\w+|\S+\.py)|\b(?:node|bash|sh)\s+\S+\.(?:js|mjs|sh)")
+# "should pass", "will be done", "not fixed", "if it works": not a report of success.
+HEDGED = re.compile(r"\b(?:should|would|will|could|might|may|must|can|cannot|not|never|until|if|whether|once|"
+                    r"(?:needs?|has|have|fails?|going|want|wants|expected)\s+to)\b|n't\b", re.I)
+EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
+# Shell commands that change files: in-place edits, patches, and output
+# redirected into a file (not a descriptor, not /dev/null).
+SHELL_EDIT = re.compile(r"\bsed\s+-i|\bperl\s+-[a-z]*i|\bgit\s+(?:apply|am|restore|checkout\s+--)\b|\bpatch\b|\btee\b")
+REDIRECT = re.compile(r"(?<![\d&>=-])>>?\s*(?![&>]|/dev/)([\w./~\"'$][^\s;&|)]*)")
+QUOTED_SH = re.compile(r"'[^'\n]*'|\"[^\"\n]*\"")
+# A script fed on stdin that writes files.
+SCRIPT_WRITE = re.compile(r"\.write_(?:text|bytes)\(|\bopen\([^)\n]*,\s*(?:mode\s*=\s*)?['\"][wax]b?\+?['\"]|\bfs\.writeFileSync\(")
+HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1[^\n]*\n(.*?)(?:\n\2\s*(?=\n|$)|\Z)", re.S)
+
+
+def inside(path, root):
+    """False only for a path known to be outside the repo being guarded."""
+    if root is None or not path or path[0] in "\"'$":
+        return True
+    full = os.path.abspath(os.path.join(root, os.path.expanduser(path)))
+    return full == root or full.startswith(root.rstrip(os.sep) + os.sep)
+
+
+def shell_actions(cmd, root=None):
+    """The edits and checks one shell command makes, in the order they appear.
+
+    Heredoc bodies are data, not commands: a test file being written mentions
+    pytest without running it. A body piped into an interpreter that writes
+    files counts as an edit where the heredoc starts. A `>` inside quotes is
+    text, and a redirect into a file outside `root` does not touch the repo.
+    """
+    found, bodies, outside, last = [], [], [], 0
+    for m in HEREDOC.finditer(cmd):
+        outside.append(cmd[last:m.start()] + " " * (m.end() - m.start()))
+        bodies.append((m.start(), m.group(3)))
+        last = m.end()
+    outside = "".join(outside) + cmd[last:]
+    unquoted = QUOTED_SH.sub(lambda q: q.group(0)[0] + " " * (len(q.group(0)) - 2) + q.group(0)[-1], outside)
+    for m in SHELL_EDIT.finditer(unquoted):
+        found.append((m.start(), "edit"))
+    for m in REDIRECT.finditer(unquoted):
+        target = outside[m.start(1):m.end(1)].strip("\"'")
+        if inside(target, root):
+            found.append((m.start(), "edit"))
+    for m in CHECK_CMD.finditer(outside):
+        found.append((m.start(), "check"))
+    for at, body in bodies:
+        if SCRIPT_WRITE.search(body):
+            found.append((at, "edit"))
+    return [kind for _, kind in sorted(found)]
+# Quoting a phrase is talking about it, not claiming with it.
+QUOTED = re.compile(r"```.*?```|`[^`\n]*`|\"[^\"\n]*\"|\u201c[^\u201d\n]*\u201d", re.S)
 
 SECRET_RULES = [
     ("AWS access key", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
@@ -133,19 +228,49 @@ def is_binary(path):
         return True
 
 
+def read_lines(root, rel):
+    """Every line of one file, or nothing when it is missing or binary."""
+    full = rel if os.path.isabs(rel) else os.path.join(root, rel)
+    if not os.path.isfile(full) or is_binary(full):
+        return []
+    with open(full, encoding="utf-8", errors="ignore") as fh:
+        return [(rel, i, line.rstrip("\n")) for i, line in enumerate(fh, 1)]
+
+
+def head_exists(root):
+    try:
+        git(root, "rev-parse", "--verify", "-q", "HEAD")
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def uncommitted(root):
+    """Staged and unstaged changes plus new untracked files.
+
+    This is the scope at the end of an agent turn: the work often sits unstaged,
+    and the riskiest file is usually one that was just created.
+    """
+    scope = ["HEAD"] if head_exists(root) else ["--cached"]
+    names = git(root, "diff", "--name-only", "--diff-filter=ACMR", *scope, "--", ".")
+    diff = git(root, "diff", "-U0", "--diff-filter=ACMR", *scope, "--", ".")
+    new = [f for f in git(root, "ls-files", "--others", "--exclude-standard", "--", ".").splitlines() if f]
+    lines = list(added_lines_from_diff(diff))
+    for f in new:
+        lines.extend(read_lines(root, f))
+    return [n for n in names.splitlines() if n] + new, lines
+
+
 def collect(args, root):
     """Return (files, lines) to check."""
     if args.all:
         files = [f for f in git(root, "ls-files", "--", ".").splitlines() if f]
         lines = []
         for f in files:
-            full = f if os.path.isabs(f) else os.path.join(root, f)
-            if not os.path.isfile(full) or is_binary(full):
-                continue
-            with open(full, encoding="utf-8", errors="ignore") as fh:
-                for i, line in enumerate(fh, 1):
-                    lines.append((f, i, line.rstrip("\n")))
+            lines.extend(read_lines(root, f))
         return files, lines
+    if args.uncommitted:
+        return uncommitted(root)
     if args.range:
         names = git(root, "diff", "--name-only", "--diff-filter=ACMR", args.range, "--", ".")
         diff = git(root, "diff", "-U0", "--diff-filter=ACMR", args.range, "--", ".")
@@ -166,13 +291,39 @@ def file_findings(files, root):
     return out
 
 
-def project_checks(root):
+def run_check(cmd, root, out=None, shell=False):
+    """Run one project check. Returns its exit code, or None when it cannot run.
+
+    With `out` set, the command's output is captured and its tail echoed there:
+    a Stop hook only reaches the agent through its own stderr, so a failing
+    suite has to be reprinted rather than streamed to an unread stdout.
+    """
+    name = cmd if shell else cmd[0]
+    if not shell and not shutil.which(name):
+        return None
+    try:
+        if out is None:
+            return subprocess.run(cmd, cwd=root, shell=shell).returncode
+        p = subprocess.run(cmd, cwd=root, shell=shell, capture_output=True, text=True, errors="replace")
+    except OSError as err:
+        print(f"vibe-check: cannot run {name}: {err}", file=sys.stderr)
+        return None
+    if p.returncode:
+        for line in (p.stdout + p.stderr).strip().splitlines()[-40:]:
+            print(line, file=out)
+    return p.returncode
+
+
+def project_checks(root, out=None):
     """Detect and run the project's own lint, type and test commands."""
     def at(*parts):
         return os.path.join(root, *parts)
 
     cmds = []
-    makefile = open(at("Makefile"), encoding="utf-8", errors="replace").read() if os.path.isfile(at("Makefile")) else ""
+    makefile = ""
+    if os.path.isfile(at("Makefile")):
+        with open(at("Makefile"), encoding="utf-8", errors="replace") as fh:
+            makefile = fh.read()
     if re.search(r"^check:", makefile, re.M):
         cmds.append(["make", "check"])
     elif os.path.isfile(at("package.json")):
@@ -190,12 +341,13 @@ def project_checks(root):
         cmds.append(["cargo", "test", "--quiet"])
     results = []
     for c in cmds:
-        rc = subprocess.run(c, cwd=root).returncode
-        results.append(("FAIL" if rc else "PASS", " ".join(c)))
+        rc = run_check(c, root, out)
+        label = "SKIP" if rc is None else "FAIL" if rc else "PASS"
+        results.append((label, " ".join(c) + ("  (not installed)" if rc is None else "")))
     return results
 
 
-def extra_checks(root, rel=os.path.join(".rubric", "checks")):
+def extra_checks(root, rel=os.path.join(".rubric", "checks"), out=None):
     """Run extra commands listed one per line in .rubric/checks (comments with #)."""
     path = os.path.join(root, rel)
     if not os.path.isfile(path):
@@ -207,8 +359,8 @@ def extra_checks(root, rel=os.path.join(".rubric", "checks")):
         cmd = raw.strip()
         if not cmd or cmd.startswith("#"):
             continue
-        rc = subprocess.run(cmd, shell=True, cwd=root).returncode
-        results.append(("FAIL" if rc else "PASS", cmd))
+        rc = run_check(cmd, root, out, shell=True)
+        results.append(("SKIP" if rc is None else "FAIL" if rc else "PASS", cmd))
     return results
 
 
@@ -228,20 +380,185 @@ def install_hook(root):
     return 0
 
 
+def hook_payload():
+    """Hook input is JSON on stdin. Missing or malformed input is not fatal."""
+    try:
+        raw = "" if sys.stdin is None or sys.stdin.isatty() else sys.stdin.read()
+    except OSError:
+        return {}
+    try:
+        data = json.loads(raw) if raw.strip() else {}
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def last_turn(payload, root=None):
+    """(closing message, actions) from the transcript.
+
+    Claude Code passes `transcript_path`, a JSONL file with one content block per
+    line. The closing message is the assistant text after the last `user` entry
+    (tool results arrive as `user` entries too). Actions span the whole session,
+    in order, as (kind, command, failed) with kind "edit" or "check": a check
+    stays valid across turns until the next edit, so describing work verified
+    two turns ago, with nothing changed since, is not an unbacked claim.
+    """
+    path = payload.get("transcript_path")
+    given = payload.get("last_assistant_message")
+    if not isinstance(path, str) or not os.path.isfile(os.path.expanduser(path)):
+        return (given if isinstance(given, str) else ""), []
+    parts, actions, pending = [], [], {}
+    with open(os.path.expanduser(path), encoding="utf-8", errors="replace") as fh:
+        for raw in fh:
+            try:
+                entry = json.loads(raw)
+            except ValueError:
+                continue
+            if not isinstance(entry, dict):
+                continue
+            content = (entry.get("message") or {}).get("content")
+            blocks = [b for b in content if isinstance(b, dict)] if isinstance(content, list) else []
+            if entry.get("type") == "user":
+                for b in (b for b in blocks if b.get("type") == "tool_result"):
+                    i = pending.pop(b.get("tool_use_id"), None)
+                    if i is not None and b.get("is_error"):
+                        actions[i] = actions[i][:2] + (True,)
+                parts = []
+            elif entry.get("type") == "assistant":
+                if isinstance(content, str):
+                    parts.append(content)
+                for b in blocks:
+                    if b.get("type") == "text":
+                        parts.append(b.get("text") or "")
+                    elif b.get("type") == "tool_use":
+                        args = b.get("input") or {}
+                        name, cmd = b.get("name", ""), str(args.get("command", ""))
+                        if name in EDIT_TOOLS:
+                            target = str(args.get("file_path") or args.get("notebook_path") or "")
+                            kinds = ["edit"] if inside(target, root) else []
+                        else:
+                            kinds = shell_actions(cmd, root) if cmd else []
+                        for kind in kinds:
+                            actions.append((kind, (cmd or name).split("\n")[0], False))
+                        if kinds:
+                            # The result belongs to the command's last action: in
+                            # `edit && check`, a failure is the check's to report.
+                            pending[b.get("id")] = len(actions) - 1
+    text = given if isinstance(given, str) else "\n".join(parts)
+    return text, actions
+
+
+def closing_message(payload):
+    return last_turn(payload)[0]
+
+
+def backing_findings(text, actions):
+    """FAIL when the closing message reports success that no passing check after the last edit backs.
+
+    Wording-independent on purpose: rephrasing a claim does not change whether a
+    check ran after the last edit, or whether it passed.
+    """
+    plain = QUOTED.sub(" ", text.translate(APOSTROPHES))
+    m = next((m for m in SUCCESS_RX.finditer(plain) if not HEDGED.search(m.group(0))), None)
+    if not m:
+        return []
+    said = " ".join(m.group(0).split())
+    last_edit = max((i for i, a in enumerate(actions) if a[0] == "edit"), default=-1)
+    checks = [a for a in actions[last_edit + 1:] if a[0] == "check"]
+    if checks and checks[-1][2]:
+        why = "the last check after the last edit failed: " + checks[-1][1][:60]
+    elif checks:
+        return []
+    elif any(a[0] == "check" for a in actions):
+        why = "every check ran before the last edit"
+    else:
+        why = "no check was run to back it"
+    return [("FAIL", "closing message", 0, f'Reports success ("{said}") but {why}')]
+
+
+def claim_findings(text):
+    """FAIL for each red-flag phrase used, outside code and quotes, in the closing message."""
+    plain = QUOTED.sub(" ", text.translate(APOSTROPHES))
+    seen = []
+    canonical = {f.lower(): f for f in RED_FLAGS}
+    for m in RED_FLAG_RX.finditer(plain):
+        phrase = canonical[m.group(1).lower()]
+        if phrase not in seen:
+            seen.append(phrase)
+    return [("FAIL", "closing message", 0, f'Predicts instead of proves: "{p}"') for p in seen]
+
+
+def install_stop_hook(root, rel=os.path.join(".claude", "settings.json")):
+    """Add a Stop hook so a turn cannot end while the gate is failing."""
+    path = os.path.join(root, rel)
+    cmd = 'python3 "%s" --stop-hook --full' % os.path.abspath(__file__)
+    settings = {}
+    if os.path.isfile(path):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                settings = json.load(fh)
+        except ValueError as err:
+            print(f"{path} is not valid JSON ({err}); add the hook by hand:\n  {cmd}", file=sys.stderr)
+            return 2
+    hooks = settings.setdefault("hooks", {}) if isinstance(settings, dict) else None
+    stop = hooks.setdefault("Stop", []) if isinstance(hooks, dict) else None
+    if not isinstance(stop, list):
+        print(f"{path} already defines hooks in a shape this cannot extend; add the hook by hand:\n  {cmd}",
+              file=sys.stderr)
+        return 2
+    for entry in stop:
+        for h in (entry.get("hooks") or []) if isinstance(entry, dict) else []:
+            if "--stop-hook" in str(h.get("command", "")):
+                print(f"A vibe-check Stop hook is already configured in {path}")
+                return 0
+    stop.append({"hooks": [{"type": "command", "command": cmd, "timeout": STOP_HOOK_TIMEOUT}]})
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(settings, fh, indent=2)
+        fh.write("\n")
+    print(f"Installed vibe-check Stop hook in {path}")
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="rubric quality and compliance gate")
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--all", action="store_true", help="scan every tracked file")
     g.add_argument("--range", help="scan a git range, e.g. origin/main...HEAD")
+    g.add_argument("--uncommitted", action="store_true",
+                   help="scan staged and unstaged changes plus new untracked files")
     ap.add_argument("--repo", default=".", help="repo to check (default: .)")
     ap.add_argument("--full", action="store_true", help="also run the project's lint/type/test commands")
     ap.add_argument("--install-hook", action="store_true", help="run vibe-check on every commit")
+    ap.add_argument("--stop-hook", action="store_true",
+                    help="run as an agent Stop hook: scan uncommitted work, report on stderr, exit 2 on FAIL")
+    ap.add_argument("--install-stop-hook", action="store_true",
+                    help="add the Stop hook to .claude/settings.json")
+    ap.add_argument("--no-claim-check", action="store_true",
+                    help="with --stop-hook, skip checking the closing message's wording and claims")
     # Extra commands (formatters, gitleaks, iac-check, ...) can be listed in .rubric/checks
     args = ap.parse_args(argv)
     root = os.path.abspath(args.repo)
 
     if args.install_hook:
         return install_hook(root)
+    if args.install_stop_hook:
+        return install_stop_hook(root)
+
+    out = sys.stdout
+    claims = []
+    if args.stop_hook:
+        payload = hook_payload()
+        # The agent is already being sent back once; blocking again would loop.
+        if payload.get("stop_hook_active"):
+            return 0
+        if not args.no_claim_check:
+            text, actions = last_turn(payload, root)
+            claims = claim_findings(text) + backing_findings(text, actions)
+        # Only stderr reaches the agent when a Stop hook blocks.
+        out = sys.stderr
+        if not (args.all or args.range):
+            args.uncommitted = True
     try:
         files, lines = collect(args, root)
     except subprocess.CalledProcessError as e:
@@ -251,20 +568,24 @@ def main(argv=None):
         print(f"vibe-check: git timed out after {GIT_TIMEOUT}s in {root}", file=sys.stderr)
         return 2
 
-    findings = file_findings(files, root)
+    findings = file_findings(files, root) + claims
     for path, lineno, line in lines:
         findings.extend(scan_line(path, lineno, line))
 
-    checks = (project_checks(root) if args.full else []) + extra_checks(root)
+    stream = out if args.stop_hook else None
+    checks = (project_checks(root, stream) if args.full else []) + extra_checks(root, out=stream)
     fails = sum(1 for f in findings if f[0] == "FAIL") + sum(1 for c in checks if c[0] == "FAIL")
     warns = sum(1 for f in findings if f[0] == "WARN")
 
     for level, path, lineno, msg in sorted(findings, key=lambda f: (f[0] != "FAIL", f[1], f[2])):
         loc = f"{path}:{lineno}" if lineno else path
-        print(f"{level:<5} {loc}  {msg}")
+        print(f"{level:<5} {loc}  {msg}", file=out)
     for level, cmd in checks:
-        print(f"{level:<5} {cmd}")
-    print(f"vibe-check: {fails} FAIL, {warns} WARN, {len(lines)} lines scanned")
+        print(f"{level:<5} {cmd}", file=out)
+    print(f"vibe-check: {fails} FAIL, {warns} WARN, {len(lines)} lines scanned", file=out)
+    if args.stop_hook and fails:
+        print(STOP_REASON, file=out)
+        return 2
     return 1 if fails else 0
 
 

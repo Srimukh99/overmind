@@ -1,6 +1,42 @@
 # Changelog
 
 ## 0.8.0
+- `ship/references/receipts.md` now covers the claim itself, not only the proof:
+  a list of phrases that mean the command has not been run ("should work",
+  "looks right", "I'm confident"), an excuse-and-reality table for the nine
+  reasons a check gets skipped, a delegation row that sends you to the VCS diff
+  instead of a subagent's report, and a requirements checklist built from the
+  original request rather than from memory of it.
+- New: `vibe_check.py --stop-hook`, a gate for the end of an agent turn. It scans the uncommitted work - staged, unstaged **and**
+  new untracked files, where a just-created secret hides - reports on stderr
+  because that is the only stream handed back to an agent, and exits 2 so the
+  turn returns with the findings instead of ending on an unproven claim. It
+  stands down on `stop_hook_active`, so it blocks once rather than looping. It
+  also reads the agent's closing message from the transcript and FAILs on the
+  `receipts.md` red-flag words ("should work", "I'm confident") outside quotes
+  and code; a test keeps the script's list and the prose list identical. A
+  second message check reads actions, not wording: success reported in any
+  words ("Done!", "ready to merge") FAILs unless a check ran after the last
+  edit and passed. Edits include shell writes; edits outside the repo do not
+  count. `--no-claim-check` turns both off.
+- `receipts.md` closes three gaps: rewording a prediction or celebrating
+  ("Done!") is still a claim; a regression test counts only once it has been
+  seen failing with the fix backed out (also in `build/references/prove-it.md`);
+  and new excuse rows for a partial check and the last step of a task.
+  `--install-stop-hook` merges it into `.claude/settings.json` without touching
+  hooks already there, `--uncommitted` exposes the new scope on its own, and
+  this repo ships its own hook in `.claude/settings.json` with a `make check`
+  target for it to run.
+- `--full` no longer crashes or lies when a detected command is missing: a tool
+  that is not installed prints `SKIP`, not `PASS`, and a failing check's output
+  is echoed into the hook's stderr rather than streamed to a stdout no agent
+  reads.
+- New eval, `evals/claim_guard.py`: turns that end in a claim with no receipt.
+  The Stop hook, run for real, stops 16 of 19, and 9 of the 12 cases written
+  before its message checks; it blocks 0 of 6 honest closings and 0 of 12 real
+  closing messages replayed from the session that built it. Three claims no
+  script can see remain, and the naming score is read as a floor, since the
+  cases and the guidance were written together.
 - Renamed from overmind to **rubric**. Four separate projects over 500 stars
   already shared the old name, including a 3,747-star Procfile manager. Project
   state moves from `.overmind/` to `.rubric/`, checkpoints from

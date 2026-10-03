@@ -8,7 +8,7 @@ Read script summaries, never raw test output.
 - New behaviour: example test.
 - Logic over many inputs (parsing, money, dates, validation, serialization): add one property test (Hypothesis, fast-check, gopter, jqwik, proptest). One property covers what ten examples miss.
 - Changing code that has no tests: characterization test first. Pin what it does today, then change it.
-- Bug: a test that reproduces it, failing for the reported reason.
+- Bug: a test that reproduces it, failing for the reported reason. If the fix is already written, the test has never been seen failing: back the fix out, watch the test fail for the reported reason, restore the fix, watch it pass. A regression test that passes either way guards nothing.
 
 ## Loop
 1. **Shape**: write the types, signature or interface. Run `loop.py fast`. The compiler is the cheapest test.

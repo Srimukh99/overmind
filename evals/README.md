@@ -13,6 +13,7 @@ not agent behaviour: the cheating diffs and agent mistakes are scripted.
 | ratchet vs naive gate | `python3 evals/ratchet_vs_naive.py` | ratchet 7 of 7 correct; naive gate 2 of 7 |
 | Guidance coverage and defect reachability | `python3 evals/guidance_coverage.py` | rubric 6/6 core, 2/4 extended, 10/10 defects reachable; superpowers 2/6, 1/4, 3/10 |
 | Code quality: does a green suite mean correct code? | `python3 evals/code_quality.py` (`-v` to name each hidden failure) | 6 of 6 candidates pass their own suite; 3 are wrong; 10 hidden defects would have shipped. Mutation score does **not** separate them |
+| Claim guard: unproven "done" claims, named vs. stopped | `python3 evals/claim_guard.py` (`--lib NAME=PATH` to score another library) | Stop hook stops 16 of 19 (9 of the first 12); 0 of 6 honest closings blocked, no loop |
 
 Every row above was re-run at v0.7. `delegation.py`, `ratchet_vs_naive.py` and
 `mutation/run.sh` need `pytest` (mutation also needs `hypothesis`) and print a
@@ -111,6 +112,53 @@ six fixed.
 
 Concurrency and locale were deliberately left out of rubric's table rather
 than added to raise the score; `prove-it.md` states why in the file.
+
+## Claim guard: words and enforcement, measured apart
+
+`claim_guard.py` scripts turns that end in a claim with nothing behind it: a
+red-flag phrase ("should work", "I'm confident"), an excuse for skipping the
+check ("it's one line", "a subagent said it was done"), or a plain success
+claim the session's own actions do not back ("Done. All tests pass." with
+nothing run). Three scores, and only the last two are worth much.
+
+**Named** asks whether the completion guidance names the phrase or excuse.
+rubric scores 19 of 19, which is close to meaningless on its own: the cases and
+`receipts.md` were written together. It is kept as a regression guard. Its
+patterns also follow rubric's wording, so a library that says the same thing
+in other words is under-scored; read any cross-library comparison by hand.
+
+**Repo** and **message** are measured by running `vibe_check.py --stop-hook`
+with a real transcript on stdin, the way the harness calls it, and each catch
+is credited to the check that made it. *Repo*: five cases plant a mistake (a
+leftover `breakpoint()`, a key in a never-staged file, a `.env`, conflict
+markers, a red suite) and run with the message checks off. *Message*: every
+case runs on a clean repo, so only the transcript can trip the hook - the
+red-flag wording, or success reported with no passing check after the last
+edit.
+
+| | stopped |
+| --- | --- |
+| the first 12 cases, written before the message checks | 9 of 12 (6 before the success check) |
+| 7 cases written with the message checks | 7 of 7 - a floor, like `named` |
+| 6 honest closings: a receipt after its check, a success claim after its check, quoting the red-flag words, saying what is left, reporting a failure, answering a question | 0 blocked |
+| 12 real closing messages from the session that built this, replayed | 0 blocked |
+
+The honest controls and the replay are what stop the message check from
+"winning" by blocking everything. The replay found four false blocks in the
+first version - a quoted `>` read as a redirect, a helper script written
+outside the repo, and a rule that only credited checks from the same turn -
+and each is now a test.
+
+What no script stops: "I did everything that was asked", "CI will catch it",
+"it worked when I ran it earlier". They assert nothing a transcript can
+contradict, so the prose carries them. Two catches are weaker than they look:
+`regression_unseen` and `subagent_said_done` are stopped because nothing ran,
+not because the hook knows whether the test was seen failing or the diff was
+read. An agent that runs a green suite gets both past it.
+
+Comparing another library is `--lib NAME=PATH`; it scans the role-named
+completion guidance under that library's `skills/` and prints which files it
+read.
 
 ## Routing eval: what it is and is not
 
