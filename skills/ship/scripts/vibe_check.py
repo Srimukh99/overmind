@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """vibe-check: a fast, dependency-free quality and compliance gate.
 
-Scans added lines (staged, a git range, or the whole repo) for secrets,
-regulated identifiers, debug leftovers and conflict markers. Exit code 1 on FAIL.
+Scans added lines (staged, uncommitted, a git range, or the whole repo) for
+secrets, regulated identifiers, debug leftovers and conflict markers. Exit code
+1 on FAIL.
 
 Checks the repo given by --repo, defaulting to the current directory, so the
 gate works from any project without being installed into it.
+
+--stop-hook runs it as an agent Stop hook: it scans the uncommitted work, prints
+to stderr so the findings reach the agent, and exits 2 to send the turn back
+instead of letting it end on an unproven claim.
 """
 import argparse
 import json
@@ -19,6 +24,13 @@ import sys
 IGNORE_MARK = "vibe-check: ignore"
 MAX_BYTES = 5 * 1024 * 1024
 GIT_TIMEOUT = 120
+STOP_HOOK_TIMEOUT = 600
+STOP_REASON = (
+    "vibe-check failed, so this work is not provably done. Fix every FAIL above, "
+    "re-run the gate, and report the result as a receipt (command -> key output "
+    "line). If a check cannot be run here, say \"unverified\" and why rather than "
+    "claiming it passed."
+)
 
 SECRET_RULES = [
     ("AWS access key", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
@@ -133,19 +145,49 @@ def is_binary(path):
         return True
 
 
+def read_lines(root, rel):
+    """Every line of one file, or nothing when it is missing or binary."""
+    full = rel if os.path.isabs(rel) else os.path.join(root, rel)
+    if not os.path.isfile(full) or is_binary(full):
+        return []
+    with open(full, encoding="utf-8", errors="ignore") as fh:
+        return [(rel, i, line.rstrip("\n")) for i, line in enumerate(fh, 1)]
+
+
+def head_exists(root):
+    try:
+        git(root, "rev-parse", "--verify", "-q", "HEAD")
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def uncommitted(root):
+    """Staged and unstaged changes plus new untracked files.
+
+    This is the scope at the end of an agent turn: the work often sits unstaged,
+    and the riskiest file is usually one that was just created.
+    """
+    scope = ["HEAD"] if head_exists(root) else ["--cached"]
+    names = git(root, "diff", "--name-only", "--diff-filter=ACMR", *scope, "--", ".")
+    diff = git(root, "diff", "-U0", "--diff-filter=ACMR", *scope, "--", ".")
+    new = [f for f in git(root, "ls-files", "--others", "--exclude-standard", "--", ".").splitlines() if f]
+    lines = list(added_lines_from_diff(diff))
+    for f in new:
+        lines.extend(read_lines(root, f))
+    return [n for n in names.splitlines() if n] + new, lines
+
+
 def collect(args, root):
     """Return (files, lines) to check."""
     if args.all:
         files = [f for f in git(root, "ls-files", "--", ".").splitlines() if f]
         lines = []
         for f in files:
-            full = f if os.path.isabs(f) else os.path.join(root, f)
-            if not os.path.isfile(full) or is_binary(full):
-                continue
-            with open(full, encoding="utf-8", errors="ignore") as fh:
-                for i, line in enumerate(fh, 1):
-                    lines.append((f, i, line.rstrip("\n")))
+            lines.extend(read_lines(root, f))
         return files, lines
+    if args.uncommitted:
+        return uncommitted(root)
     if args.range:
         names = git(root, "diff", "--name-only", "--diff-filter=ACMR", args.range, "--", ".")
         diff = git(root, "diff", "-U0", "--diff-filter=ACMR", args.range, "--", ".")
@@ -166,13 +208,39 @@ def file_findings(files, root):
     return out
 
 
-def project_checks(root):
+def run_check(cmd, root, out=None, shell=False):
+    """Run one project check. Returns its exit code, or None when it cannot run.
+
+    With `out` set, the command's output is captured and its tail echoed there:
+    a Stop hook only reaches the agent through its own stderr, so a failing
+    suite has to be reprinted rather than streamed to an unread stdout.
+    """
+    name = cmd if shell else cmd[0]
+    if not shell and not shutil.which(name):
+        return None
+    try:
+        if out is None:
+            return subprocess.run(cmd, cwd=root, shell=shell).returncode
+        p = subprocess.run(cmd, cwd=root, shell=shell, capture_output=True, text=True, errors="replace")
+    except OSError as err:
+        print(f"vibe-check: cannot run {name}: {err}", file=sys.stderr)
+        return None
+    if p.returncode:
+        for line in (p.stdout + p.stderr).strip().splitlines()[-40:]:
+            print(line, file=out)
+    return p.returncode
+
+
+def project_checks(root, out=None):
     """Detect and run the project's own lint, type and test commands."""
     def at(*parts):
         return os.path.join(root, *parts)
 
     cmds = []
-    makefile = open(at("Makefile"), encoding="utf-8", errors="replace").read() if os.path.isfile(at("Makefile")) else ""
+    makefile = ""
+    if os.path.isfile(at("Makefile")):
+        with open(at("Makefile"), encoding="utf-8", errors="replace") as fh:
+            makefile = fh.read()
     if re.search(r"^check:", makefile, re.M):
         cmds.append(["make", "check"])
     elif os.path.isfile(at("package.json")):
@@ -190,12 +258,13 @@ def project_checks(root):
         cmds.append(["cargo", "test", "--quiet"])
     results = []
     for c in cmds:
-        rc = subprocess.run(c, cwd=root).returncode
-        results.append(("FAIL" if rc else "PASS", " ".join(c)))
+        rc = run_check(c, root, out)
+        label = "SKIP" if rc is None else "FAIL" if rc else "PASS"
+        results.append((label, " ".join(c) + ("  (not installed)" if rc is None else "")))
     return results
 
 
-def extra_checks(root, rel=os.path.join(".rubric", "checks")):
+def extra_checks(root, rel=os.path.join(".rubric", "checks"), out=None):
     """Run extra commands listed one per line in .rubric/checks (comments with #)."""
     path = os.path.join(root, rel)
     if not os.path.isfile(path):
@@ -207,8 +276,8 @@ def extra_checks(root, rel=os.path.join(".rubric", "checks")):
         cmd = raw.strip()
         if not cmd or cmd.startswith("#"):
             continue
-        rc = subprocess.run(cmd, shell=True, cwd=root).returncode
-        results.append(("FAIL" if rc else "PASS", cmd))
+        rc = run_check(cmd, root, out, shell=True)
+        results.append(("SKIP" if rc is None else "FAIL" if rc else "PASS", cmd))
     return results
 
 
@@ -228,20 +297,83 @@ def install_hook(root):
     return 0
 
 
+def hook_payload():
+    """Hook input is JSON on stdin. Missing or malformed input is not fatal."""
+    try:
+        raw = "" if sys.stdin is None or sys.stdin.isatty() else sys.stdin.read()
+    except OSError:
+        return {}
+    try:
+        data = json.loads(raw) if raw.strip() else {}
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def install_stop_hook(root, rel=os.path.join(".claude", "settings.json")):
+    """Add a Stop hook so a turn cannot end while the gate is failing."""
+    path = os.path.join(root, rel)
+    cmd = 'python3 "%s" --stop-hook --full' % os.path.abspath(__file__)
+    settings = {}
+    if os.path.isfile(path):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                settings = json.load(fh)
+        except ValueError as err:
+            print(f"{path} is not valid JSON ({err}); add the hook by hand:\n  {cmd}", file=sys.stderr)
+            return 2
+    hooks = settings.setdefault("hooks", {}) if isinstance(settings, dict) else None
+    stop = hooks.setdefault("Stop", []) if isinstance(hooks, dict) else None
+    if not isinstance(stop, list):
+        print(f"{path} already defines hooks in a shape this cannot extend; add the hook by hand:\n  {cmd}",
+              file=sys.stderr)
+        return 2
+    for entry in stop:
+        for h in (entry.get("hooks") or []) if isinstance(entry, dict) else []:
+            if "--stop-hook" in str(h.get("command", "")):
+                print(f"A vibe-check Stop hook is already configured in {path}")
+                return 0
+    stop.append({"hooks": [{"type": "command", "command": cmd, "timeout": STOP_HOOK_TIMEOUT}]})
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(settings, fh, indent=2)
+        fh.write("\n")
+    print(f"Installed vibe-check Stop hook in {path}")
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="rubric quality and compliance gate")
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--all", action="store_true", help="scan every tracked file")
     g.add_argument("--range", help="scan a git range, e.g. origin/main...HEAD")
+    g.add_argument("--uncommitted", action="store_true",
+                   help="scan staged and unstaged changes plus new untracked files")
     ap.add_argument("--repo", default=".", help="repo to check (default: .)")
     ap.add_argument("--full", action="store_true", help="also run the project's lint/type/test commands")
     ap.add_argument("--install-hook", action="store_true", help="run vibe-check on every commit")
+    ap.add_argument("--stop-hook", action="store_true",
+                    help="run as an agent Stop hook: scan uncommitted work, report on stderr, exit 2 on FAIL")
+    ap.add_argument("--install-stop-hook", action="store_true",
+                    help="add the Stop hook to .claude/settings.json")
     # Extra commands (formatters, gitleaks, iac-check, ...) can be listed in .rubric/checks
     args = ap.parse_args(argv)
     root = os.path.abspath(args.repo)
 
     if args.install_hook:
         return install_hook(root)
+    if args.install_stop_hook:
+        return install_stop_hook(root)
+
+    out = sys.stdout
+    if args.stop_hook:
+        # The agent is already being sent back once; blocking again would loop.
+        if hook_payload().get("stop_hook_active"):
+            return 0
+        # Only stderr reaches the agent when a Stop hook blocks.
+        out = sys.stderr
+        if not (args.all or args.range):
+            args.uncommitted = True
     try:
         files, lines = collect(args, root)
     except subprocess.CalledProcessError as e:
@@ -255,16 +387,20 @@ def main(argv=None):
     for path, lineno, line in lines:
         findings.extend(scan_line(path, lineno, line))
 
-    checks = (project_checks(root) if args.full else []) + extra_checks(root)
+    stream = out if args.stop_hook else None
+    checks = (project_checks(root, stream) if args.full else []) + extra_checks(root, out=stream)
     fails = sum(1 for f in findings if f[0] == "FAIL") + sum(1 for c in checks if c[0] == "FAIL")
     warns = sum(1 for f in findings if f[0] == "WARN")
 
     for level, path, lineno, msg in sorted(findings, key=lambda f: (f[0] != "FAIL", f[1], f[2])):
         loc = f"{path}:{lineno}" if lineno else path
-        print(f"{level:<5} {loc}  {msg}")
+        print(f"{level:<5} {loc}  {msg}", file=out)
     for level, cmd in checks:
-        print(f"{level:<5} {cmd}")
-    print(f"vibe-check: {fails} FAIL, {warns} WARN, {len(lines)} lines scanned")
+        print(f"{level:<5} {cmd}", file=out)
+    print(f"vibe-check: {fails} FAIL, {warns} WARN, {len(lines)} lines scanned", file=out)
+    if args.stop_hook and fails:
+        print(STOP_REASON, file=out)
+        return 2
     return 1 if fails else 0
 
 

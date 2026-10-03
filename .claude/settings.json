@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/skills/ship/scripts/vibe_check.py\" --stop-hook --full",
+            "timeout": 600
+          }
+        ]
+      }
+    ]
+  }
+}

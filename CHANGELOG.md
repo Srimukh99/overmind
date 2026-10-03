@@ -1,6 +1,31 @@
 # Changelog
 
 ## 0.8.0
+- `ship/references/receipts.md` now covers the claim itself, not only the proof:
+  a list of phrases that mean the command has not been run ("should work",
+  "looks right", "I'm confident"), an excuse-and-reality table for the nine
+  reasons a check gets skipped, a delegation row that sends you to the VCS diff
+  instead of a subagent's report, and a requirements checklist built from the
+  original request rather than from memory of it.
+- New: `vibe_check.py --stop-hook`, a gate for the end of an agent turn. It scans the uncommitted work - staged, unstaged **and**
+  new untracked files, where a just-created secret hides - reports on stderr
+  because that is the only stream handed back to an agent, and exits 2 so the
+  turn returns with the findings instead of ending on an unproven claim. It
+  stands down on `stop_hook_active`, so it blocks once rather than looping.
+  `--install-stop-hook` merges it into `.claude/settings.json` without touching
+  hooks already there, `--uncommitted` exposes the new scope on its own, and
+  this repo ships its own hook in `.claude/settings.json` with a `make check`
+  target for it to run.
+- `--full` no longer crashes or lies when a detected command is missing: a tool
+  that is not installed prints `SKIP`, not `PASS`, and a failing check's output
+  is echoed into the hook's stderr rather than streamed to a stdout no agent
+  reads.
+- New eval, `evals/claim_guard.py`: twelve turns that end in a claim with no
+  receipt. `receipts.md` names 12 of 12; the Stop hook, run for real against
+  five planted repos, stops 5 of 12, blocks no clean work and does not loop.
+  The gap is the point - the other seven are judgement claims no scanner sees -
+  and the naming score is read as a floor, since the cases and the guidance
+  were written together.
 - Renamed from overmind to **rubric**. Four separate projects over 500 stars
   already shared the old name, including a 3,747-star Procfile manager. Project
   state moves from `.overmind/` to `.rubric/`, checkpoints from
