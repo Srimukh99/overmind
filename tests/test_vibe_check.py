@@ -239,17 +239,25 @@ class StopHookTests(GateRepo, unittest.TestCase):
 
 
 def transcript(path, *entries):
-    """Write a Claude Code style JSONL transcript: ('user'|'tool'|'say'|'call', text)."""
-    lines = []
+    """Write a Claude Code style JSONL transcript.
+
+    Entries: ('user', prompt), ('say', text), ('call', bash command), ('edit', file),
+    ('tool', result) and ('toolerr', failed result); a result answers the last call.
+    """
+    lines, n = [], 0
     for kind, text in entries:
         if kind == "user":
             lines.append({"type": "user", "message": {"role": "user", "content": text}})
-        elif kind == "tool":
-            lines.append({"type": "user", "message": {"role": "user", "content": [
-                {"type": "tool_result", "tool_use_id": "t", "content": text}]}})
-        elif kind == "call":
-            lines.append({"type": "assistant", "message": {"role": "assistant", "content": [
-                {"type": "tool_use", "id": "t", "name": "Bash", "input": {"command": text}}]}})
+        elif kind in ("tool", "toolerr"):
+            block = {"type": "tool_result", "tool_use_id": "t%d" % n, "content": text}
+            if kind == "toolerr":
+                block["is_error"] = True
+            lines.append({"type": "user", "message": {"role": "user", "content": [block]}})
+        elif kind in ("call", "edit"):
+            n += 1
+            use = {"type": "tool_use", "id": "t%d" % n, "name": "Bash", "input": {"command": text}} if kind == "call" \
+                else {"type": "tool_use", "id": "t%d" % n, "name": "Edit", "input": {"file_path": text}}
+            lines.append({"type": "assistant", "message": {"role": "assistant", "content": [use]}})
         else:
             lines.append({"type": "assistant", "message": {"role": "assistant", "content": [
                 {"type": "text", "text": text}]}})
@@ -309,6 +317,103 @@ class ClaimWordingTests(unittest.TestCase):
         self.assertEqual(listed, vc.RED_FLAGS)
 
 
+class ClaimBackingTests(unittest.TestCase):
+    """Success must be backed by a passing check run after the last edit."""
+
+    def setUp(self):
+        self.d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.d, True)
+
+    def verdict(self, *entries):
+        text, actions = vc.last_turn({"transcript_path": transcript(pathlib.Path(self.d, "t.jsonl"), *entries)})
+        found = vc.backing_findings(text, actions)
+        return found[0][3] if found else "ok"
+
+    def test_unhedged_claim_with_nothing_run_is_caught(self):
+        """The hole the word list leaves: no red-flag word, nothing run."""
+        v = self.verdict(("user", "fix it"), ("edit", "app.py"), ("tool", "ok"), ("say", "Done. All tests pass."))
+        self.assertIn("no check was run", v)
+
+    def test_check_after_the_last_edit_backs_the_claim(self):
+        self.assertEqual(self.verdict(("user", "fix it"), ("edit", "app.py"), ("tool", "ok"),
+                                      ("call", "python3 -m pytest -q"), ("tool", "4 passed"),
+                                      ("say", "Fixed. All tests pass: pytest -q -> 4 passed")), "ok")
+
+    def test_check_before_the_last_edit_does_not(self):
+        v = self.verdict(("user", "fix it"), ("call", "pytest -q"), ("tool", "4 passed"),
+                         ("edit", "app.py"), ("tool", "ok"), ("say", "Fixed, tests pass."))
+        self.assertIn("before the last edit", v)
+
+    def test_a_failed_check_does_not(self):
+        v = self.verdict(("user", "fix it"), ("edit", "app.py"), ("tool", "ok"),
+                         ("call", "npm test"), ("toolerr", "1 failing"), ("say", "It works now."))
+        self.assertIn("last check after the last edit failed", v)
+
+    def test_a_check_from_an_earlier_turn_holds_until_the_next_edit(self):
+        """Describing verified work later, with nothing changed since, is not a fresh claim."""
+        earlier = [("user", "fix it"), ("edit", "app.py"), ("tool", "ok"), ("call", "make check"), ("tool", "OK"),
+                   ("say", "Verified: make check -> OK"), ("user", "push it")]
+        self.assertEqual(self.verdict(*earlier, ("call", "git push"), ("tool", "ok"), ("say", "Pushed; tests pass.")), "ok")
+        v = self.verdict(*earlier, ("edit", "app.py"), ("tool", "ok"), ("say", "Tidied. All tests pass."))
+        self.assertIn("before the last edit", v)
+
+    def test_paraphrase_is_still_a_claim(self):
+        """Different words, same claim: rewording does not change what was run."""
+        for said in ("Perfect!", "CI is green.", "Everything is working.", "Ready to merge."):
+            self.assertIn("no check was run", self.verdict(("user", "x"), ("say", said)), said)
+
+    def test_no_claim_needs_no_check(self):
+        for said in ("I could not run the tests here; unverified.", "Partially done: the UI is left.",
+                     "The test that should pass is test_x; it fails with 3 != 4.", "The bug is not fixed yet."):
+            self.assertEqual(self.verdict(("user", "x"), ("say", said)), "ok", said)
+
+    def test_quoted_claim_is_not_a_claim(self):
+        self.assertEqual(self.verdict(("user", "x"), ("say", 'The old message said "all tests pass".')), "ok")
+
+    def test_shell_edits_count_as_edits(self):
+        v = self.verdict(("user", "x"), ("call", "pytest"), ("tool", "ok"),
+                         ("call", "sed -i s/a/b/ app.py"), ("tool", ""), ("say", "Fixed."))
+        self.assertIn("before the last edit", v)
+
+
+class ShellActionTests(unittest.TestCase):
+    """What a shell command does to the backing of a claim, read in order."""
+
+    CASES = {
+        "make check": ["check"],
+        "make check 2>&1 | tail -3": ["check"],
+        "cat > app.py <<'EOF'\nimport pytest\nEOF": ["edit"],                  # a body mentioning pytest runs nothing
+        "cat > app.py <<'EOF'\nx\nEOF\npython3 -m pytest -q": ["edit", "check"],
+        "python3 - <<'PY'\nimport pathlib\npathlib.Path('a').write_text('x')\nPY\nmake check": ["edit", "check"],
+        "python3 - <<'PY'\nprint(open('a').read())\nPY": [],                     # reading is not writing
+        "python3 - <<'PY'\nopen(p, mode='a').write('x')\nPY": ["edit"],
+        "sed -i s/a/b/ f && npm test": ["edit", "check"],
+        "npm test && sed -i s/a/b/ f": ["check", "edit"],
+        "echo '{}' > .claude/settings.json": ["edit"],
+        "ls > /dev/null; echo hi >&2": [],
+        "grep -n 'a -> b' file": [],
+        "git push origin main": [],
+        "git log -1 --format='%h %an <%ae>'": [],                               # a quoted > is text
+        'echo "commit: $(git log --format=\'%h <%ae>\')"': [],
+        "cat > /elsewhere/helper.sh <<'EOF'\nx\nEOF": [],                     # outside the repo
+        "cat > src/app.py <<'EOF'\nx\nEOF": ["edit"],
+    }
+
+    def test_cases(self):
+        for cmd, want in self.CASES.items():
+            self.assertEqual(vc.shell_actions(cmd, "/repo"), want, cmd)
+
+    def test_edit_tool_outside_the_repo_is_not_an_edit(self):
+        d = tempfile.mkdtemp(); self.addCleanup(shutil.rmtree, d, True)
+        path = transcript(pathlib.Path(d, "t.jsonl"), ("user", "x"), ("call", "make check"), ("tool", "ok"))
+        rows = [json.loads(l) for l in pathlib.Path(path).read_text().splitlines()]
+        rows.append({"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "z", "name": "Write", "input": {"file_path": "/tmp/notes.md"}}]}})
+        pathlib.Path(path).write_text("\n".join(json.dumps(r) for r in rows))
+        self.assertEqual([a[0] for a in vc.last_turn({"transcript_path": path}, "/repo")[1]], ["check"])
+        self.assertEqual([a[0] for a in vc.last_turn({"transcript_path": path})[1]], ["check", "edit"])
+
+
 class ClaimWordingHookTests(GateRepo, unittest.TestCase):
     """End to end: the hook blocks on wording alone, on a repo with nothing wrong in it."""
 
@@ -329,6 +434,12 @@ class ClaimWordingHookTests(GateRepo, unittest.TestCase):
         rc, _, err = self.gate(d, "--stop-hook", payload=self.payload(
             d, ("user", "x"), ("call", "make check"), ("tool", "OK"), ("say", "Verified: make check -> Ran 4 tests, OK")))
         self.assertEqual(rc, 0, err)
+
+    def test_unbacked_success_on_clean_repo_blocks(self):
+        d = self.repo()
+        rc, _, err = self.gate(d, "--stop-hook", payload=self.payload(d, ("user", "x"), ("say", "Done. All tests pass.")))
+        self.assertEqual(rc, 2, err)
+        self.assertIn("no check was run", err)
 
     def test_no_claim_check_turns_it_off(self):
         d = self.repo()

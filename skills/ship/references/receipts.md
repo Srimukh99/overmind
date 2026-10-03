@@ -6,6 +6,7 @@ Every claim needs proof you produced just now.
 | --- | --- |
 | Tests pass | Test command output from this session showing 0 failures |
 | Bug fixed | The original repro now behaves correctly |
+| Regression test added | The test fails with the fix backed out and passes with it restored. A test never seen failing proves nothing about the bug |
 | It builds | Build command output |
 | Deployed | Health check or smoke test against the target |
 | Faster / cheaper | Before and after numbers from the same measurement |
@@ -26,6 +27,12 @@ go into a message, the command has not been run yet:
 Replace the prediction with the command and its output, or write "unverified"
 and why. Hedging is not a third option: a hedge still ships the claim.
 
+The list is a sample, not a loophole. A reworded prediction ("ought to be good
+now", "fingers crossed") is still a prediction, and celebrating is a claim too:
+"Done!", "Perfect!" and "all green" report success as surely as "tests pass".
+What makes a sentence honest is not its wording but what stands behind it: a
+check from this turn, run after the last edit, that passed.
+
 ## Excuse and reality
 
 | About to be said | What is actually true |
@@ -39,6 +46,9 @@ and why. Hedging is not a third option: a hedge still ships the claim.
 | "I did everything that was asked" | That is what is remembered being asked. Re-read the request and tick each requirement against the diff |
 | "CI will catch it" | CI catches it after the claim was made, in front of everyone else |
 | "It worked when I ran it earlier" | Earlier was before the last three edits. Run it again |
+| "The quick check passed" | It proves the part it checked. Run the rest, or name what was not run |
+| "The regression test passes" | So would a test that checks nothing. Back the fix out once and watch it fail |
+| "This is the last step, I'll wrap up" | The end of a task is where shortcuts ship. The last claim needs the same receipt as the first |
 
 ## Requirements checklist
 
@@ -66,6 +76,12 @@ down was never checked: the list comes from the request, not from memory of it.
 `Verified: <claim> — <command> → <key output line>`
 
 The gate enforces the part a script can enforce. `references/vibe-check.md`
-installs it as a Stop hook: a turn whose closing message uses one of the words
-above, outside quotes or code, is sent back, and so is a turn that leaves the
-repo failing the gate. Quote a phrase to talk about it; drop it to make a claim.
+installs it as a Stop hook, which sends a turn back when its closing message:
+
+- uses one of the words above outside quotes or code;
+- reports success, in any words, with no check run this turn, only checks run
+  before the last edit, or a last check that failed;
+- or leaves the repo failing the gate.
+
+Quote a phrase to talk about it. A claim the hook cannot see, such as a
+subagent's report or a requirement nobody wrote down, is still yours to back.

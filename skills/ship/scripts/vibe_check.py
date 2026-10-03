@@ -10,8 +10,9 @@ gate works from any project without being installed into it.
 
 --stop-hook runs it as an agent Stop hook: it scans the uncommitted work, reads
 the agent's closing message for wording that predicts instead of proves ("should
-work", "I'm confident"), prints to stderr so the findings reach the agent, and
-exits 2 to send the turn back instead of letting it end on an unproven claim.
+work", "I'm confident") and for success it reports with no passing check run
+after the last edit, prints to stderr so the findings reach the agent, and exits
+2 to send the turn back instead of letting it end on an unproven claim.
 """
 import argparse
 import json
@@ -43,6 +44,74 @@ RED_FLAGS = [
 ]
 APOSTROPHES = str.maketrans({"\u2019": "'", "\u2018": "'"})
 RED_FLAG_RX = re.compile(r"(?<![\w'])(%s)(?![\w'])" % "|".join(re.escape(f) for f in RED_FLAGS), re.I)
+# A sentence that reports success. Each one needs a passing check behind it, run
+# after the last edit, whatever words it uses.
+SUCCESS_RX = re.compile(
+    r"\b(?:all\s+)?(?:\d+\s+)?(?:tests?|specs?|suite|checks?|build|lint(?:er)?|type.?check(?:s|er)?|ci)\b"
+    r"[^.\n]{0,30}?\b(?:pass(?:es|ed|ing)?|green|succeed(?:s|ed)?|clean|ok)\b"
+    r"|\b(?:is|are|it's|it is|now|all|everything(?:'s| is)?)\s+(?:done|fixed|working|complete|resolved|good|green|set)\b"
+    r"|\b(?:it|this|that|everything)\s+works\b|\bworks\s+(?:now|fine|correctly|as expected)\b"
+    r"|\bready\s+(?:to|for)\s+(?:merge|ship|review|deploy)\b"
+    r"|(?:^|\n)\s*(?:done|fixed|all set|all good|perfect|great|success)\s*[!.]",
+    re.I)
+# Commands that check something. Broad on purpose: the question is whether
+# anything was checked after the last edit, not which runner was right.
+CHECK_CMD = re.compile(
+    r"\b(?:pytest|unittest|tox|nox|jest|vitest|mocha|rspec|phpunit|ctest|tsc|eslint|ruff|flake8|mypy|"
+    r"pyright|pylint|gradlew?|mvn|vibe_check\.py|loop\.py|curl|"
+    r"(?:npm|pnpm|yarn)\s+(?:run\s+)?(?:test|lint|build|check|typecheck)|"
+    r"go\s+(?:test|vet|build)|cargo\s+(?:test|build|check|clippy)|dotnet\s+(?:test|build)|"
+    r"bazel\s+(?:test|build)|swift\s+(?:test|build)|make)\b"
+    r"|\bpython[\d.]*\s+(?:-m\s+\w+|\S+\.py)|\b(?:node|bash|sh)\s+\S+\.(?:js|mjs|sh)")
+# "should pass", "will be done", "not fixed", "if it works": not a report of success.
+HEDGED = re.compile(r"\b(?:should|would|will|could|might|may|must|can|cannot|not|never|until|if|whether|once|"
+                    r"(?:needs?|has|have|fails?|going|want|wants|expected)\s+to)\b|n't\b", re.I)
+EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
+# Shell commands that change files: in-place edits, patches, and output
+# redirected into a file (not a descriptor, not /dev/null).
+SHELL_EDIT = re.compile(r"\bsed\s+-i|\bperl\s+-[a-z]*i|\bgit\s+(?:apply|am|restore|checkout\s+--)\b|\bpatch\b|\btee\b")
+REDIRECT = re.compile(r"(?<![\d&>=-])>>?\s*(?![&>]|/dev/)([\w./~\"'$][^\s;&|)]*)")
+QUOTED_SH = re.compile(r"'[^'\n]*'|\"[^\"\n]*\"")
+# A script fed on stdin that writes files.
+SCRIPT_WRITE = re.compile(r"\.write_(?:text|bytes)\(|\bopen\([^)\n]*,\s*(?:mode\s*=\s*)?['\"][wax]b?\+?['\"]|\bfs\.writeFileSync\(")
+HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1[^\n]*\n(.*?)(?:\n\2\s*(?=\n|$)|\Z)", re.S)
+
+
+def inside(path, root):
+    """False only for a path known to be outside the repo being guarded."""
+    if root is None or not path or path[0] in "\"'$":
+        return True
+    full = os.path.abspath(os.path.join(root, os.path.expanduser(path)))
+    return full == root or full.startswith(root.rstrip(os.sep) + os.sep)
+
+
+def shell_actions(cmd, root=None):
+    """The edits and checks one shell command makes, in the order they appear.
+
+    Heredoc bodies are data, not commands: a test file being written mentions
+    pytest without running it. A body piped into an interpreter that writes
+    files counts as an edit where the heredoc starts. A `>` inside quotes is
+    text, and a redirect into a file outside `root` does not touch the repo.
+    """
+    found, bodies, outside, last = [], [], [], 0
+    for m in HEREDOC.finditer(cmd):
+        outside.append(cmd[last:m.start()] + " " * (m.end() - m.start()))
+        bodies.append((m.start(), m.group(3)))
+        last = m.end()
+    outside = "".join(outside) + cmd[last:]
+    unquoted = QUOTED_SH.sub(lambda q: q.group(0)[0] + " " * (len(q.group(0)) - 2) + q.group(0)[-1], outside)
+    for m in SHELL_EDIT.finditer(unquoted):
+        found.append((m.start(), "edit"))
+    for m in REDIRECT.finditer(unquoted):
+        target = outside[m.start(1):m.end(1)].strip("\"'")
+        if inside(target, root):
+            found.append((m.start(), "edit"))
+    for m in CHECK_CMD.finditer(outside):
+        found.append((m.start(), "check"))
+    for at, body in bodies:
+        if SCRIPT_WRITE.search(body):
+            found.append((at, "edit"))
+    return [kind for _, kind in sorted(found)]
 # Quoting a phrase is talking about it, not claiming with it.
 QUOTED = re.compile(r"```.*?```|`[^`\n]*`|\"[^\"\n]*\"|\u201c[^\u201d\n]*\u201d", re.S)
 
@@ -324,19 +393,21 @@ def hook_payload():
     return data if isinstance(data, dict) else {}
 
 
-def closing_message(payload):
-    """The agent's last words this turn: the assistant text after the last user entry.
+def last_turn(payload, root=None):
+    """(closing message, actions) from the transcript.
 
     Claude Code passes `transcript_path`, a JSONL file with one content block per
-    line. Tool results arrive as `user` entries, so text written before the last
-    tool call is not part of the closing message.
+    line. The closing message is the assistant text after the last `user` entry
+    (tool results arrive as `user` entries too). Actions span the whole session,
+    in order, as (kind, command, failed) with kind "edit" or "check": a check
+    stays valid across turns until the next edit, so describing work verified
+    two turns ago, with nothing changed since, is not an unbacked claim.
     """
-    if isinstance(payload.get("last_assistant_message"), str):
-        return payload["last_assistant_message"]
     path = payload.get("transcript_path")
+    given = payload.get("last_assistant_message")
     if not isinstance(path, str) or not os.path.isfile(os.path.expanduser(path)):
-        return ""
-    parts = []
+        return (given if isinstance(given, str) else ""), []
+    parts, actions, pending = [], [], {}
     with open(os.path.expanduser(path), encoding="utf-8", errors="replace") as fh:
         for raw in fh:
             try:
@@ -345,16 +416,64 @@ def closing_message(payload):
                 continue
             if not isinstance(entry, dict):
                 continue
+            content = (entry.get("message") or {}).get("content")
+            blocks = [b for b in content if isinstance(b, dict)] if isinstance(content, list) else []
             if entry.get("type") == "user":
+                for b in (b for b in blocks if b.get("type") == "tool_result"):
+                    i = pending.pop(b.get("tool_use_id"), None)
+                    if i is not None and b.get("is_error"):
+                        actions[i] = actions[i][:2] + (True,)
                 parts = []
             elif entry.get("type") == "assistant":
-                content = (entry.get("message") or {}).get("content")
                 if isinstance(content, str):
                     parts.append(content)
-                for block in content if isinstance(content, list) else []:
-                    if isinstance(block, dict) and block.get("type") == "text":
-                        parts.append(block.get("text") or "")
-    return "\n".join(parts)
+                for b in blocks:
+                    if b.get("type") == "text":
+                        parts.append(b.get("text") or "")
+                    elif b.get("type") == "tool_use":
+                        args = b.get("input") or {}
+                        name, cmd = b.get("name", ""), str(args.get("command", ""))
+                        if name in EDIT_TOOLS:
+                            target = str(args.get("file_path") or args.get("notebook_path") or "")
+                            kinds = ["edit"] if inside(target, root) else []
+                        else:
+                            kinds = shell_actions(cmd, root) if cmd else []
+                        for kind in kinds:
+                            actions.append((kind, (cmd or name).split("\n")[0], False))
+                        if kinds:
+                            # The result belongs to the command's last action: in
+                            # `edit && check`, a failure is the check's to report.
+                            pending[b.get("id")] = len(actions) - 1
+    text = given if isinstance(given, str) else "\n".join(parts)
+    return text, actions
+
+
+def closing_message(payload):
+    return last_turn(payload)[0]
+
+
+def backing_findings(text, actions):
+    """FAIL when the closing message reports success that no passing check after the last edit backs.
+
+    Wording-independent on purpose: rephrasing a claim does not change whether a
+    check ran after the last edit, or whether it passed.
+    """
+    plain = QUOTED.sub(" ", text.translate(APOSTROPHES))
+    m = next((m for m in SUCCESS_RX.finditer(plain) if not HEDGED.search(m.group(0))), None)
+    if not m:
+        return []
+    said = " ".join(m.group(0).split())
+    last_edit = max((i for i, a in enumerate(actions) if a[0] == "edit"), default=-1)
+    checks = [a for a in actions[last_edit + 1:] if a[0] == "check"]
+    if checks and checks[-1][2]:
+        why = "the last check after the last edit failed: " + checks[-1][1][:60]
+    elif checks:
+        return []
+    elif any(a[0] == "check" for a in actions):
+        why = "every check ran before the last edit"
+    else:
+        why = "no check was run to back it"
+    return [("FAIL", "closing message", 0, f'Reports success ("{said}") but {why}')]
 
 
 def claim_findings(text):
@@ -416,7 +535,7 @@ def main(argv=None):
     ap.add_argument("--install-stop-hook", action="store_true",
                     help="add the Stop hook to .claude/settings.json")
     ap.add_argument("--no-claim-check", action="store_true",
-                    help="with --stop-hook, skip reading the closing message for red-flag wording")
+                    help="with --stop-hook, skip checking the closing message's wording and claims")
     # Extra commands (formatters, gitleaks, iac-check, ...) can be listed in .rubric/checks
     args = ap.parse_args(argv)
     root = os.path.abspath(args.repo)
@@ -434,7 +553,8 @@ def main(argv=None):
         if payload.get("stop_hook_active"):
             return 0
         if not args.no_claim_check:
-            claims = claim_findings(closing_message(payload))
+            text, actions = last_turn(payload, root)
+            claims = claim_findings(text) + backing_findings(text, actions)
         # Only stderr reaches the agent when a Stop hook blocks.
         out = sys.stderr
         if not (args.all or args.range):

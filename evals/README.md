@@ -13,7 +13,7 @@ not agent behaviour: the cheating diffs and agent mistakes are scripted.
 | ratchet vs naive gate | `python3 evals/ratchet_vs_naive.py` | ratchet 7 of 7 correct; naive gate 2 of 7 |
 | Guidance coverage and defect reachability | `python3 evals/guidance_coverage.py` | rubric 6/6 core, 2/4 extended, 10/10 defects reachable; superpowers 2/6, 1/4, 3/10 |
 | Code quality: does a green suite mean correct code? | `python3 evals/code_quality.py` (`-v` to name each hidden failure) | 6 of 6 candidates pass their own suite; 3 are wrong; 10 hidden defects would have shipped. Mutation score does **not** separate them |
-| Claim guard: unproven "done" claims, named vs. stopped | `python3 evals/claim_guard.py` (`--lib NAME=PATH` to score another library) | `receipts.md` names 12 of 12; the Stop hook stops 6 of 12 (repo 5, wording 3); 0 of 2 honest closings blocked, no loop |
+| Claim guard: unproven "done" claims, named vs. stopped | `python3 evals/claim_guard.py` (`--lib NAME=PATH` to score another library) | Stop hook stops 16 of 19 (9 of the first 12); 0 of 6 honest closings blocked, no loop |
 
 Every row above was re-run at v0.7. `delegation.py`, `ratchet_vs_naive.py` and
 `mutation/run.sh` need `pytest` (mutation also needs `hypothesis`) and print a
@@ -115,44 +115,50 @@ than added to raise the score; `prove-it.md` states why in the file.
 
 ## Claim guard: words and enforcement, measured apart
 
-`claim_guard.py` scripts twelve turns that end in a claim with nothing behind
-it - a red-flag phrase ("should work", "looks right", "I'm confident") or an
-excuse for skipping the check ("it's one line", "a subagent said it was done",
-"CI will catch it"). It scores two different things, and only one of them is
-worth much.
+`claim_guard.py` scripts turns that end in a claim with nothing behind it: a
+red-flag phrase ("should work", "I'm confident"), an excuse for skipping the
+check ("it's one line", "a subagent said it was done"), or a plain success
+claim the session's own actions do not back ("Done. All tests pass." with
+nothing run). Three scores, and only the last two are worth much.
 
-**Named** asks whether the library's completion guidance names that phrase or
-excuse. rubric scores 12 of 12, and that number is close to meaningless on its
-own: the cases and `receipts.md` were written in the same change, so this is a
-floor on what the prose covers, not evidence it is broad. It is kept as a
-regression guard - thinning the red-flag list or dropping the delegation row
-fails `tests/test_claim_guard.py`. Two rows carry a second pattern so a
-half-answer cannot score: the delegation row only counts if it sends you to the
-diff, and the requirements row only if it sends you back to the request.
+**Named** asks whether the completion guidance names the phrase or excuse.
+rubric scores 19 of 19, which is close to meaningless on its own: the cases and
+`receipts.md` were written together. It is kept as a regression guard. Its
+patterns also follow rubric's wording, so a library that says the same thing
+in other words is under-scored; read any cross-library comparison by hand.
 
-**Stopped** is measured, not asserted, by two checks run apart so each catch is
-credited to the check that made it. *Repo*: five cases plant a real mistake in
-a throwaway repo - a leftover `breakpoint()`, a cloud key in a file that was
-never staged, a `.env` added beside a one-line change, conflict markers in a
-"docs only" edit, a red suite - and run `vibe_check.py --stop-hook` with the
-word check off. *Words*: every case's closing message goes to the hook as a
-real transcript, on a clean repo, so only the wording can trip it. A case
-counts only when the gate exits 2. Three controls must exit 0 every run: a
-closing message that is a receipt, one that only quotes the red-flag words
-while discussing them, and a payload carrying `stop_hook_active`, since a Stop
-hook that re-blocks its own output loops forever.
+**Repo** and **message** are measured by running `vibe_check.py --stop-hook`
+with a real transcript on stdin, the way the harness calls it, and each catch
+is credited to the check that made it. *Repo*: five cases plant a mistake (a
+leftover `breakpoint()`, a key in a never-staged file, a `.env`, conflict
+markers, a red suite) and run with the message checks off. *Message*: every
+case runs on a clean repo, so only the transcript can trip the hook - the
+red-flag wording, or success reported with no passing check after the last
+edit.
 
-The gap is the finding: **6 of 12** (repo 5, words 3; the "should work" and
-"looks right" turns trip both). The other six are judgement
-claims - a subagent's report taken on trust, a requirement no one wrote down,
-"the types check, so it works" - and no pattern in a scanner sees them. The
-word check is a fixed list on purpose: widening it to the excuse phrases would
-raise the score and start blocking honest sentences. That is why the
-prose half exists, and why the prose half cannot be graded by the same
-measurement that grades the hook. Comparing another library is `--lib
-NAME=PATH`; it scans the role-named completion guidance under that library's
-`skills/` and prints which files it read, so a 0 that came from a file-naming
-mismatch is visible rather than silent.
+| | stopped |
+| --- | --- |
+| the first 12 cases, written before the message checks | 9 of 12 (6 before the success check) |
+| 7 cases written with the message checks | 7 of 7 - a floor, like `named` |
+| 6 honest closings: a receipt after its check, a success claim after its check, quoting the red-flag words, saying what is left, reporting a failure, answering a question | 0 blocked |
+| 12 real closing messages from the session that built this, replayed | 0 blocked |
+
+The honest controls and the replay are what stop the message check from
+"winning" by blocking everything. The replay found four false blocks in the
+first version - a quoted `>` read as a redirect, a helper script written
+outside the repo, and a rule that only credited checks from the same turn -
+and each is now a test.
+
+What no script stops: "I did everything that was asked", "CI will catch it",
+"it worked when I ran it earlier". They assert nothing a transcript can
+contradict, so the prose carries them. Two catches are weaker than they look:
+`regression_unseen` and `subagent_said_done` are stopped because nothing ran,
+not because the hook knows whether the test was seen failing or the diff was
+read. An agent that runs a green suite gets both past it.
+
+Comparing another library is `--lib NAME=PATH`; it scans the role-named
+completion guidance under that library's `skills/` and prints which files it
+read.
 
 ## Routing eval: what it is and is not
 
