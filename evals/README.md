@@ -13,6 +13,7 @@ not agent behaviour: the cheating diffs and agent mistakes are scripted.
 | ratchet vs naive gate | `python3 evals/ratchet_vs_naive.py` | ratchet 7 of 7 correct; naive gate 2 of 7 |
 | Guidance coverage and defect reachability | `python3 evals/guidance_coverage.py` | rubric 6/6 core, 2/4 extended, 10/10 defects reachable; superpowers 2/6, 1/4, 3/10 |
 | Code quality: does a green suite mean correct code? | `python3 evals/code_quality.py` (`-v` to name each hidden failure) | 6 of 6 candidates pass their own suite; 3 are wrong; 10 hidden defects would have shipped. Mutation score does **not** separate them |
+| Claim guard: unproven "done" claims, named vs. stopped | `python3 evals/claim_guard.py` (`--lib NAME=PATH` to score another library) | `receipts.md` names 12 of 12; the Stop hook stops the 5 of 12 a script can see; clean work not blocked, no loop |
 
 Every row above was re-run at v0.7. `delegation.py`, `ratchet_vs_naive.py` and
 `mutation/run.sh` need `pytest` (mutation also needs `hypothesis`) and print a
@@ -111,6 +112,40 @@ six fixed.
 
 Concurrency and locale were deliberately left out of rubric's table rather
 than added to raise the score; `prove-it.md` states why in the file.
+
+## Claim guard: words and enforcement, measured apart
+
+`claim_guard.py` scripts twelve turns that end in a claim with nothing behind
+it - a red-flag phrase ("should work", "looks right", "I'm confident") or an
+excuse for skipping the check ("it's one line", "a subagent said it was done",
+"CI will catch it"). It scores two different things, and only one of them is
+worth much.
+
+**Named** asks whether the library's completion guidance names that phrase or
+excuse. rubric scores 12 of 12, and that number is close to meaningless on its
+own: the cases and `receipts.md` were written in the same change, so this is a
+floor on what the prose covers, not evidence it is broad. It is kept as a
+regression guard - thinning the red-flag list or dropping the delegation row
+fails `tests/test_claim_guard.py`. Two rows carry a second pattern so a
+half-answer cannot score: the delegation row only counts if it sends you to the
+diff, and the requirements row only if it sends you back to the request.
+
+**Stopped** is measured, not asserted. Each of five cases plants a real mistake
+in a throwaway repo - a leftover `breakpoint()`, a cloud key in a file that was
+never staged, a `.env` added beside a one-line change, conflict markers in a
+"docs only" edit, a red suite - and runs `vibe_check.py --stop-hook` against it.
+A case counts only when the gate exits 2. Two controls run every time: clean
+work must not be blocked, and a payload carrying `stop_hook_active` must exit 0,
+since a Stop hook that re-blocks its own output loops forever.
+
+The gap is the finding: **5 of 12**. The other seven are judgement claims - a
+subagent's report taken on trust, a requirement no one wrote down, "the types
+check, so it works" - and no pattern in a scanner sees them. That is why the
+prose half exists, and why the prose half cannot be graded by the same
+measurement that grades the hook. Comparing another library is `--lib
+NAME=PATH`; it scans the role-named completion guidance under that library's
+`skills/` and prints which files it read, so a 0 that came from a file-naming
+mismatch is visible rather than silent.
 
 ## Routing eval: what it is and is not
 

@@ -28,6 +28,7 @@ Fourteen core skills cover the delivery cycle. Four optional packs add depth for
 - [Token budget](#token-budget)
 - [Upgrading](#upgrading)
 - [Contributing](#contributing)
+- [Credits](#credits)
 - [Support](#support)
 - [Roadmap](#roadmap)
 - [Scope and limitations](#scope-and-limitations)
@@ -145,7 +146,7 @@ Skills are checked before the task begins, not offered afterwards.
 
 ## Evidence
 
-Each mechanism is measured against the alternative, using scripted adversaries rather than argument. Every figure is reproducible on your machine; `evals/README.md` has the method and the caveats, and CI runs all five on every push.
+Each mechanism is measured against the alternative, using scripted adversaries rather than argument. Every figure is reproducible on your machine; `evals/README.md` has the method and the caveats, and CI runs every one of them on every push.
 
 | Mechanism | rubric | The alternative |
 | --- | --- | --- |
@@ -155,6 +156,7 @@ Each mechanism is measured against the alternative, using scripted adversaries r
 | **Mutation testing** (`build`) | a strong suite kills **33 of 33** injected bugs | a green suite that kills **8 of 33** — and still reports every test passing |
 | **Skill routing** (`boot`) | **98%** top-1, **100%** top-3, 76% on a frozen held-out set, every legacy trigger preserved | 3.6% by chance across 28 skills |
 | **Boundary guidance** (`build`) | names **6 of 6** defect classes the acceptance suites exercise, and **10 of 10** real defects are reachable from it | a green suite: **6 of 6** candidates pass their own tests and **3 are wrong** |
+| **Claim guard** (`ship`) | names **12 of 12** unproven-claim turns, and the Stop hook stops the **5 of 12** a script can see, with 0 false blocks | nothing stops a turn that ends in "should work now" |
 
 ```bash
 python3 evals/delegation.py          # needs pytest
@@ -164,6 +166,7 @@ sh evals/mutation/run.sh             # needs pytest + hypothesis
 python3 evals/routing.py
 python3 evals/code_quality.py
 python3 evals/guidance_coverage.py
+python3 evals/claim_guard.py
 ```
 
 Two results are worth dwelling on, because both are uncomfortable.
@@ -243,7 +246,7 @@ python3 packs/k8s/skills/crd-check/scripts/crd_check.py deploy/ --target 1.30
 python3 packs/k8s/skills/drift/scripts/drift_check.py --k8s-dir deploy/ -n prod
 ```
 
-Most of these only read. The ones that write say so: `ratchet` keeps state in `.rubric/` and checkpoints under `refs/rubric/`, `team` creates worktrees and applies patches, `loop.py mutate` edits changed files and restores them, `service_map.py --okf` writes `docs/okf`, and `vibe_check.py --install-hook` writes a commit hook. `drift_check.py` never writes to a cluster, only to a local history file.
+Most of these only read. The ones that write say so: `ratchet` keeps state in `.rubric/` and checkpoints under `refs/rubric/`, `team` creates worktrees and applies patches, `loop.py mutate` edits changed files and restores them, `service_map.py --okf` writes `docs/okf`, `vibe_check.py --install-hook` writes a commit hook, and `vibe_check.py --install-stop-hook` adds a Stop hook to `.claude/settings.json`. `drift_check.py` never writes to a cluster, only to a local history file.
 
 ## The ship gate
 
@@ -253,8 +256,10 @@ Most of these only read. The ones that write say so: `ratchet` keeps state in `.
 python3 skills/ship/scripts/vibe_check.py                  # staged changes in the current repo
 python3 skills/ship/scripts/vibe_check.py --repo ../myapp  # or another repo
 python3 skills/ship/scripts/vibe_check.py --range origin/main...HEAD
+python3 skills/ship/scripts/vibe_check.py --uncommitted     # staged, unstaged and new untracked files
 python3 skills/ship/scripts/vibe_check.py --full           # and the project's lint, types and tests
 python3 skills/ship/scripts/vibe_check.py --install-hook   # run on every commit
+python3 skills/ship/scripts/vibe_check.py --install-stop-hook  # run when an agent turn tries to end
 ```
 
 | Finding | Level |
@@ -267,6 +272,8 @@ python3 skills/ship/scripts/vibe_check.py --install-hook   # run on every commit
 | Merge conflict markers | FAIL |
 | Hard-coded secret-looking assignments | WARN |
 | Files over 5 MB | WARN |
+
+Two hooks, two moments. `--install-hook` blocks a commit. `--install-stop-hook` blocks the end of an agent turn: the gate scans the uncommitted work — staged, unstaged and new untracked files — runs the project's checks with `--full`, reports on stderr (the only stream handed back to an agent) and exits 2, which returns the turn with the findings instead of letting it end on "should work now". It stands down when the hook input carries `stop_hook_active`, so it blocks once rather than looping, and this repository ships its own in `.claude/settings.json`.
 
 A deliberate false positive can carry `vibe-check: ignore` on the line, used sparingly and explained in the pull request.
 
@@ -326,6 +333,10 @@ Script paths moved with their skills: `skills/prove-it/scripts/loop.py` is now `
 6. Regulated-domain skills need a source for every rule and must stay labelled as engineering guidance rather than legal advice.
 
 See `CONTRIBUTING.md` for the full process.
+
+## Credits
+
+The claim-making half of `ship`'s receipts — the list of phrases that signal a prediction rather than a receipt, and the excuse-versus-reality table that answers them — was prompted by the completion-verification guidance in the **Superpowers** skill library. The rows, the wording and the enforcement are rubric's own, and `evals/claim_guard.py` measures what each half is worth: the prose names all twelve scripted claims, a script can only stop five of them.
 
 ## Support
 

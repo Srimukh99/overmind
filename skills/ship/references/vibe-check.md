@@ -39,6 +39,33 @@ python3 <iac-check skill folder>/scripts/iac_check.py infra/ deploy/
 ## Make it automatic
 
 - Commit hook: `python3 <this skill folder>/scripts/vibe_check.py --install-hook` (won't overwrite an existing hook).
+- Stop hook, so a turn cannot end on an unproven claim: `python3 <this skill folder>/scripts/vibe_check.py --install-stop-hook` adds it to `.claude/settings.json` and leaves any hook already there alone.
 - CI: see `.github/workflows/ci.yml` in the rubric repo for a ready job.
 
 Never bypass commit hooks (`--no-verify`) unless the user explicitly asks.
+
+## The Stop hook
+
+The commit hook catches what reaches a commit. The Stop hook catches the turn
+that ends with "done" and nothing committed at all.
+
+```json
+{"hooks": {"Stop": [{"hooks": [
+  {"type": "command",
+   "command": "python3 <this skill folder>/scripts/vibe_check.py --stop-hook --full",
+   "timeout": 600}
+]}]}}
+```
+
+| Behaviour | Why |
+| --- | --- |
+| Scans staged **and** unstaged changes plus new untracked files | At the end of a turn the work is usually uncommitted, and the riskiest file is the one just created |
+| Reports on stderr, not stdout | Only stderr is handed back to the agent when a Stop hook blocks |
+| Exits 2 on FAIL | Exit 2 returns the turn with the findings; exit 1 would only log them |
+| Stands down when the hook input carries `stop_hook_active` | It blocks once and hands back the output, rather than looping on itself |
+| Prints SKIP for a command the host does not have | A missing linter is not a pass; read the SKIP lines |
+
+`--full` runs the project's lint, type and test commands on every turn end, so
+it costs what those commands cost. Three ways to tune it: drop `--full` to keep
+the scan alone, change `timeout` (seconds, and a timed-out hook blocks nothing),
+or point a `make check` target at the subset worth paying for every turn.

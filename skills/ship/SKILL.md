@@ -17,4 +17,4 @@ Read only the part you need.
 
 Order for one change: `references/vibe-check.md` before every commit, `references/receipts.md` before any done, fixed or passing claim, `references/land.md` to finish the branch. For production, `references/preflight.md` then `references/deploy.md`.
 
-Script: `scripts/vibe_check.py` (the ship gate; `--install-hook` makes it block commits).
+Script: `scripts/vibe_check.py` (the ship gate; `--install-hook` makes it block commits, `--install-stop-hook` makes it block the end of a turn).
