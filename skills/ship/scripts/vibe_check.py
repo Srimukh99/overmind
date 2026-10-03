@@ -8,9 +8,10 @@ secrets, regulated identifiers, debug leftovers and conflict markers. Exit code
 Checks the repo given by --repo, defaulting to the current directory, so the
 gate works from any project without being installed into it.
 
---stop-hook runs it as an agent Stop hook: it scans the uncommitted work, prints
-to stderr so the findings reach the agent, and exits 2 to send the turn back
-instead of letting it end on an unproven claim.
+--stop-hook runs it as an agent Stop hook: it scans the uncommitted work, reads
+the agent's closing message for wording that predicts instead of proves ("should
+work", "I'm confident"), prints to stderr so the findings reach the agent, and
+exits 2 to send the turn back instead of letting it end on an unproven claim.
 """
 import argparse
 import json
@@ -28,9 +29,22 @@ STOP_HOOK_TIMEOUT = 600
 STOP_REASON = (
     "vibe-check failed, so this work is not provably done. Fix every FAIL above, "
     "re-run the gate, and report the result as a receipt (command -> key output "
-    "line). If a check cannot be run here, say \"unverified\" and why rather than "
-    "claiming it passed."
+    "line). A closing message that predicts (\"should work\", \"I'm confident\") "
+    "needs the command run and its output quoted instead. If a check cannot be run "
+    "here, say \"unverified\" and why rather than claiming it passed."
 )
+# Wording that predicts a result instead of reporting one. The same list, in the
+# same order, is in references/receipts.md; tests/test_vibe_check.py keeps them equal.
+RED_FLAGS = [
+    "should work", "should be fine", "looks right", "looks correct", "I think it works",
+    "I think it's fixed", "probably", "must be working", "seems to work",
+    "basically done", "mostly working", "in theory", "by inspection",
+    "obviously correct", "simple enough that", "I'm confident",
+]
+APOSTROPHES = str.maketrans({"\u2019": "'", "\u2018": "'"})
+RED_FLAG_RX = re.compile(r"(?<![\w'])(%s)(?![\w'])" % "|".join(re.escape(f) for f in RED_FLAGS), re.I)
+# Quoting a phrase is talking about it, not claiming with it.
+QUOTED = re.compile(r"```.*?```|`[^`\n]*`|\"[^\"\n]*\"|\u201c[^\u201d\n]*\u201d", re.S)
 
 SECRET_RULES = [
     ("AWS access key", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
@@ -310,6 +324,51 @@ def hook_payload():
     return data if isinstance(data, dict) else {}
 
 
+def closing_message(payload):
+    """The agent's last words this turn: the assistant text after the last user entry.
+
+    Claude Code passes `transcript_path`, a JSONL file with one content block per
+    line. Tool results arrive as `user` entries, so text written before the last
+    tool call is not part of the closing message.
+    """
+    if isinstance(payload.get("last_assistant_message"), str):
+        return payload["last_assistant_message"]
+    path = payload.get("transcript_path")
+    if not isinstance(path, str) or not os.path.isfile(os.path.expanduser(path)):
+        return ""
+    parts = []
+    with open(os.path.expanduser(path), encoding="utf-8", errors="replace") as fh:
+        for raw in fh:
+            try:
+                entry = json.loads(raw)
+            except ValueError:
+                continue
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("type") == "user":
+                parts = []
+            elif entry.get("type") == "assistant":
+                content = (entry.get("message") or {}).get("content")
+                if isinstance(content, str):
+                    parts.append(content)
+                for block in content if isinstance(content, list) else []:
+                    if isinstance(block, dict) and block.get("type") == "text":
+                        parts.append(block.get("text") or "")
+    return "\n".join(parts)
+
+
+def claim_findings(text):
+    """FAIL for each red-flag phrase used, outside code and quotes, in the closing message."""
+    plain = QUOTED.sub(" ", text.translate(APOSTROPHES))
+    seen = []
+    canonical = {f.lower(): f for f in RED_FLAGS}
+    for m in RED_FLAG_RX.finditer(plain):
+        phrase = canonical[m.group(1).lower()]
+        if phrase not in seen:
+            seen.append(phrase)
+    return [("FAIL", "closing message", 0, f'Predicts instead of proves: "{p}"') for p in seen]
+
+
 def install_stop_hook(root, rel=os.path.join(".claude", "settings.json")):
     """Add a Stop hook so a turn cannot end while the gate is failing."""
     path = os.path.join(root, rel)
@@ -356,6 +415,8 @@ def main(argv=None):
                     help="run as an agent Stop hook: scan uncommitted work, report on stderr, exit 2 on FAIL")
     ap.add_argument("--install-stop-hook", action="store_true",
                     help="add the Stop hook to .claude/settings.json")
+    ap.add_argument("--no-claim-check", action="store_true",
+                    help="with --stop-hook, skip reading the closing message for red-flag wording")
     # Extra commands (formatters, gitleaks, iac-check, ...) can be listed in .rubric/checks
     args = ap.parse_args(argv)
     root = os.path.abspath(args.repo)
@@ -366,10 +427,14 @@ def main(argv=None):
         return install_stop_hook(root)
 
     out = sys.stdout
+    claims = []
     if args.stop_hook:
+        payload = hook_payload()
         # The agent is already being sent back once; blocking again would loop.
-        if hook_payload().get("stop_hook_active"):
+        if payload.get("stop_hook_active"):
             return 0
+        if not args.no_claim_check:
+            claims = claim_findings(closing_message(payload))
         # Only stderr reaches the agent when a Stop hook blocks.
         out = sys.stderr
         if not (args.all or args.range):
@@ -383,7 +448,7 @@ def main(argv=None):
         print(f"vibe-check: git timed out after {GIT_TIMEOUT}s in {root}", file=sys.stderr)
         return 2
 
-    findings = file_findings(files, root)
+    findings = file_findings(files, root) + claims
     for path, lineno, line in lines:
         findings.extend(scan_line(path, lineno, line))
 

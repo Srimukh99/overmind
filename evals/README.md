@@ -13,7 +13,7 @@ not agent behaviour: the cheating diffs and agent mistakes are scripted.
 | ratchet vs naive gate | `python3 evals/ratchet_vs_naive.py` | ratchet 7 of 7 correct; naive gate 2 of 7 |
 | Guidance coverage and defect reachability | `python3 evals/guidance_coverage.py` | rubric 6/6 core, 2/4 extended, 10/10 defects reachable; superpowers 2/6, 1/4, 3/10 |
 | Code quality: does a green suite mean correct code? | `python3 evals/code_quality.py` (`-v` to name each hidden failure) | 6 of 6 candidates pass their own suite; 3 are wrong; 10 hidden defects would have shipped. Mutation score does **not** separate them |
-| Claim guard: unproven "done" claims, named vs. stopped | `python3 evals/claim_guard.py` (`--lib NAME=PATH` to score another library) | `receipts.md` names 12 of 12; the Stop hook stops the 5 of 12 a script can see; clean work not blocked, no loop |
+| Claim guard: unproven "done" claims, named vs. stopped | `python3 evals/claim_guard.py` (`--lib NAME=PATH` to score another library) | `receipts.md` names 12 of 12; the Stop hook stops 6 of 12 (repo 5, wording 3); 0 of 2 honest closings blocked, no loop |
 
 Every row above was re-run at v0.7. `delegation.py`, `ratchet_vs_naive.py` and
 `mutation/run.sh` need `pytest` (mutation also needs `hypothesis`) and print a
@@ -130,17 +130,24 @@ fails `tests/test_claim_guard.py`. Two rows carry a second pattern so a
 half-answer cannot score: the delegation row only counts if it sends you to the
 diff, and the requirements row only if it sends you back to the request.
 
-**Stopped** is measured, not asserted. Each of five cases plants a real mistake
-in a throwaway repo - a leftover `breakpoint()`, a cloud key in a file that was
+**Stopped** is measured, not asserted, by two checks run apart so each catch is
+credited to the check that made it. *Repo*: five cases plant a real mistake in
+a throwaway repo - a leftover `breakpoint()`, a cloud key in a file that was
 never staged, a `.env` added beside a one-line change, conflict markers in a
-"docs only" edit, a red suite - and runs `vibe_check.py --stop-hook` against it.
-A case counts only when the gate exits 2. Two controls run every time: clean
-work must not be blocked, and a payload carrying `stop_hook_active` must exit 0,
-since a Stop hook that re-blocks its own output loops forever.
+"docs only" edit, a red suite - and run `vibe_check.py --stop-hook` with the
+word check off. *Words*: every case's closing message goes to the hook as a
+real transcript, on a clean repo, so only the wording can trip it. A case
+counts only when the gate exits 2. Three controls must exit 0 every run: a
+closing message that is a receipt, one that only quotes the red-flag words
+while discussing them, and a payload carrying `stop_hook_active`, since a Stop
+hook that re-blocks its own output loops forever.
 
-The gap is the finding: **5 of 12**. The other seven are judgement claims - a
-subagent's report taken on trust, a requirement no one wrote down, "the types
-check, so it works" - and no pattern in a scanner sees them. That is why the
+The gap is the finding: **6 of 12** (repo 5, words 3; the "should work" and
+"looks right" turns trip both). The other six are judgement
+claims - a subagent's report taken on trust, a requirement no one wrote down,
+"the types check, so it works" - and no pattern in a scanner sees them. The
+word check is a fixed list on purpose: widening it to the excuse phrases would
+raise the score and start blocking honest sentences. That is why the
 prose half exists, and why the prose half cannot be graded by the same
 measurement that grades the hook. Comparing another library is `--lib
 NAME=PATH`; it scans the role-named completion guidance under that library's

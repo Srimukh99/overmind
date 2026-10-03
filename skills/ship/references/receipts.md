@@ -66,5 +66,6 @@ down was never checked: the list comes from the request, not from memory of it.
 `Verified: <claim> — <command> → <key output line>`
 
 The gate enforces the part a script can enforce. `references/vibe-check.md`
-installs it as a Stop hook, so a turn that ends on an unproven claim is sent
-back with the failing output instead of landing.
+installs it as a Stop hook: a turn whose closing message uses one of the words
+above, outside quotes or code, is sent back, and so is a turn that leaves the
+repo failing the gate. Quote a phrase to talk about it; drop it to make a claim.

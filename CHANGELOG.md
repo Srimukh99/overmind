@@ -11,7 +11,11 @@
   new untracked files, where a just-created secret hides - reports on stderr
   because that is the only stream handed back to an agent, and exits 2 so the
   turn returns with the findings instead of ending on an unproven claim. It
-  stands down on `stop_hook_active`, so it blocks once rather than looping.
+  stands down on `stop_hook_active`, so it blocks once rather than looping. It
+  also reads the agent's closing message from the transcript and FAILs on the
+  `receipts.md` red-flag words ("should work", "I'm confident") outside quotes
+  and code; a test keeps the script's list and the prose list identical, and
+  `--no-claim-check` turns it off.
   `--install-stop-hook` merges it into `.claude/settings.json` without touching
   hooks already there, `--uncommitted` exposes the new scope on its own, and
   this repo ships its own hook in `.claude/settings.json` with a `make check`
@@ -21,9 +25,10 @@
   is echoed into the hook's stderr rather than streamed to a stdout no agent
   reads.
 - New eval, `evals/claim_guard.py`: twelve turns that end in a claim with no
-  receipt. `receipts.md` names 12 of 12; the Stop hook, run for real against
-  five planted repos, stops 5 of 12, blocks no clean work and does not loop.
-  The gap is the point - the other seven are judgement claims no scanner sees -
+  receipt. `receipts.md` names 12 of 12; the Stop hook, run for real, stops
+  6 of 12 (5 on planted repos, 3 on the closing message's wording), blocks
+  neither honest closing and does not loop. The gap is the point - the other
+  six are judgement claims no scanner sees -
   and the naming score is read as a floor, since the cases and the guidance
   were written together.
 - Renamed from overmind to **rubric**. Four separate projects over 500 stars

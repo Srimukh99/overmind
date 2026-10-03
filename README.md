@@ -155,7 +155,7 @@ Each mechanism is measured against the alternative, using scripted adversaries r
 | **Mutation testing** (`build`) | a strong suite kills **33 of 33** injected bugs | a green suite that kills **8 of 33** — and still reports every test passing |
 | **Skill routing** (`boot`) | **98%** top-1, **100%** top-3, 76% on a frozen held-out set, every legacy trigger preserved | 3.6% by chance across 28 skills |
 | **Boundary guidance** (`build`) | names **6 of 6** defect classes the acceptance suites exercise, and **10 of 10** real defects are reachable from it | a green suite: **6 of 6** candidates pass their own tests and **3 are wrong** |
-| **Claim guard** (`ship`) | names **12 of 12** unproven-claim turns, and the Stop hook stops the **5 of 12** a script can see, with 0 false blocks | nothing stops a turn that ends in "should work now" |
+| **Claim guard** (`ship`) | names **12 of 12** unproven-claim turns; the Stop hook stops **6 of 12** — 5 on the planted repo, 3 on the closing message's wording — with 0 honest turns blocked | nothing stops a turn that ends in "I'm confident it works" |
 
 ```bash
 python3 evals/delegation.py          # needs pytest
@@ -272,7 +272,7 @@ python3 skills/ship/scripts/vibe_check.py --install-stop-hook  # run when an age
 | Hard-coded secret-looking assignments | WARN |
 | Files over 5 MB | WARN |
 
-Two hooks, two moments. `--install-hook` blocks a commit. `--install-stop-hook` blocks the end of an agent turn: the gate scans the uncommitted work — staged, unstaged and new untracked files — runs the project's checks with `--full`, reports on stderr (the only stream handed back to an agent) and exits 2, which returns the turn with the findings instead of letting it end on "should work now". It stands down when the hook input carries `stop_hook_active`, so it blocks once rather than looping, and this repository ships its own in `.claude/settings.json`.
+Two hooks, two moments. `--install-hook` blocks a commit. `--install-stop-hook` blocks the end of an agent turn: the gate scans the uncommitted work — staged, unstaged and new untracked files — runs the project's checks with `--full`, reads the agent's closing message for wording that predicts instead of proves ("should work", "I'm confident"; quoted phrases are ignored), reports on stderr (the only stream handed back to an agent) and exits 2, which returns the turn with the findings instead of letting it end on "should work now". It stands down when the hook input carries `stop_hook_active`, so it blocks once rather than looping, and this repository ships its own in `.claude/settings.json`.
 
 A deliberate false positive can carry `vibe-check: ignore` on the line, used sparingly and explained in the pull request.
 

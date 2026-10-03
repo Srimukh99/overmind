@@ -60,6 +60,7 @@ that ends with "done" and nothing committed at all.
 | Behaviour | Why |
 | --- | --- |
 | Scans staged **and** unstaged changes plus new untracked files | At the end of a turn the work is usually uncommitted, and the riskiest file is the one just created |
+| Reads the closing message and FAILs on the `references/receipts.md` red-flag words ("should work", "I'm confident"), ignoring quotes and code | A prediction is not a receipt; quoting a phrase to discuss it is allowed. `--no-claim-check` turns this off |
 | Reports on stderr, not stdout | Only stderr is handed back to the agent when a Stop hook blocks |
 | Exits 2 on FAIL | Exit 2 returns the turn with the findings; exit 1 would only log them |
 | Stands down when the hook input carries `stop_hook_active` | It blocks once and hands back the output, rather than looping on itself |

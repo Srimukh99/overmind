@@ -127,8 +127,8 @@ class GitIntegrationTests(unittest.TestCase):
         self.assertIn("AWS access key", out)
 
 
-class StopHookTests(unittest.TestCase):
-    """The Stop hook: what it scans, where it reports, and how it stops looping."""
+class GateRepo:
+    """A throwaway repo and a way to run the gate in it as a hook would."""
 
     def repo(self, commit="app.py"):
         d = tempfile.mkdtemp()
@@ -151,6 +151,10 @@ class StopHookTests(unittest.TestCase):
         r = subprocess.run([sys.executable, str(SCRIPT), *args], cwd=cwd, input=payload,
                            capture_output=True, text=True, env=getattr(self, "env", None))
         return r.returncode, r.stdout, r.stderr
+
+
+class StopHookTests(GateRepo, unittest.TestCase):
+    """The Stop hook: what it scans, where it reports, and how it stops looping."""
 
     def test_unstaged_change_blocks_the_turn(self):
         d = self.repo()
@@ -232,6 +236,111 @@ class StopHookTests(unittest.TestCase):
         pathlib.Path(d, "Makefile").write_text("check:\n\t@true\n")
         with unittest.mock.patch.object(vc.shutil, "which", lambda name: None):
             self.assertEqual(vc.project_checks(d), [("SKIP", "make check  (not installed)")])
+
+
+def transcript(path, *entries):
+    """Write a Claude Code style JSONL transcript: ('user'|'tool'|'say'|'call', text)."""
+    lines = []
+    for kind, text in entries:
+        if kind == "user":
+            lines.append({"type": "user", "message": {"role": "user", "content": text}})
+        elif kind == "tool":
+            lines.append({"type": "user", "message": {"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": "t", "content": text}]}})
+        elif kind == "call":
+            lines.append({"type": "assistant", "message": {"role": "assistant", "content": [
+                {"type": "tool_use", "id": "t", "name": "Bash", "input": {"command": text}}]}})
+        else:
+            lines.append({"type": "assistant", "message": {"role": "assistant", "content": [
+                {"type": "text", "text": text}]}})
+        lines.append({"type": "attachment", "attachment": {}})  # noise the reader must skip
+    pathlib.Path(path).write_text("\n".join(json.dumps(l) for l in lines) + "\n")
+    return str(path)
+
+
+class ClaimWordingTests(unittest.TestCase):
+    """The Stop hook reads the closing message for wording that predicts a result."""
+
+    def setUp(self):
+        self.d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.d, True)
+
+    def said(self, *entries):
+        return vc.closing_message({"transcript_path": transcript(pathlib.Path(self.d, "t.jsonl"), *entries)})
+
+    def flags(self, text):
+        return [f[3].split('"')[1] for f in vc.claim_findings(text)]
+
+    def test_closing_message_is_text_after_the_last_tool_result(self):
+        msg = self.said(("user", "fix it"), ("say", "Looking. It should work once I edit."),
+                        ("call", "make check"), ("tool", "Ran 3 tests OK"), ("say", "Verified: make check -> OK"))
+        self.assertEqual(msg, "Verified: make check -> OK")
+
+    def test_closing_message_joins_trailing_text_blocks(self):
+        msg = self.said(("user", "go"), ("say", "Done."), ("say", "It should work."))
+        self.assertEqual(msg, "Done.\nIt should work.")
+
+    def test_last_assistant_message_wins_when_given(self):
+        self.assertEqual(vc.closing_message({"last_assistant_message": "hi", "transcript_path": "/nope"}), "hi")
+
+    def test_missing_or_broken_transcript_is_not_fatal(self):
+        self.assertEqual(vc.closing_message({"transcript_path": "/does/not/exist.jsonl"}), "")
+        pathlib.Path(self.d, "bad.jsonl").write_text("not json\n[1, 2]\n")
+        self.assertEqual(vc.closing_message({"transcript_path": str(pathlib.Path(self.d, "bad.jsonl"))}), "")
+
+    def test_red_flags_are_caught(self):
+        self.assertEqual(self.flags("The fix should work now."), ["should work"])
+        self.assertEqual(self.flags("I\u2019m confident this is correct."), ["I'm confident"])
+        self.assertEqual(self.flags("It LOOKS RIGHT and is probably fine"), ["looks right", "probably"])
+
+    def test_quoted_and_code_phrases_are_not_claims(self):
+        self.assertEqual(self.flags('The word list has `should work` and "I\'m confident".'), [])
+        self.assertEqual(self.flags("```\nprint('should work')\n```\nVerified: tests pass"), [])
+
+    def test_receipts_and_lookalikes_pass(self):
+        self.assertEqual(self.flags("Verified: tests pass - make check -> Ran 177 tests, OK"), [])
+        self.assertEqual(self.flags("improbably, theoretical, overconfident"), [])
+
+    def test_list_matches_receipts_md(self):
+        """One list, two places: the prose the agent reads and the check that enforces it."""
+        text = (HERE.parent / "skills" / "ship" / "references" / "receipts.md").read_text()
+        section = text.split("## Words that mean the proof is missing")[1].split("##")[0]
+        listed = [m for m in __import__("re").findall(r"`([^`]+)`", section)]
+        self.assertEqual(listed, vc.RED_FLAGS)
+
+
+class ClaimWordingHookTests(GateRepo, unittest.TestCase):
+    """End to end: the hook blocks on wording alone, on a repo with nothing wrong in it."""
+
+    def payload(self, d, *entries, **extra):
+        path = transcript(pathlib.Path(d, ".t.jsonl"), *entries)
+        pathlib.Path(d, ".git", "info", "exclude").write_text(".t.jsonl\n")
+        return json.dumps({"transcript_path": path, "stop_hook_active": False, **extra})
+
+    def test_confident_closing_on_clean_repo_blocks(self):
+        d = self.repo()
+        rc, out, err = self.gate(d, "--stop-hook", payload=self.payload(d, ("user", "x"), ("say", "I'm confident it works.")))
+        self.assertEqual(rc, 2, err)
+        self.assertIn('Predicts instead of proves: "I\'m confident"', err)
+        self.assertEqual(out, "")
+
+    def test_receipt_closing_on_clean_repo_passes(self):
+        d = self.repo()
+        rc, _, err = self.gate(d, "--stop-hook", payload=self.payload(
+            d, ("user", "x"), ("call", "make check"), ("tool", "OK"), ("say", "Verified: make check -> Ran 4 tests, OK")))
+        self.assertEqual(rc, 0, err)
+
+    def test_no_claim_check_turns_it_off(self):
+        d = self.repo()
+        rc, _, err = self.gate(d, "--stop-hook", "--no-claim-check",
+                               payload=self.payload(d, ("user", "x"), ("say", "should work")))
+        self.assertEqual(rc, 0, err)
+
+    def test_second_stop_stands_down_even_on_wording(self):
+        d = self.repo()
+        rc, _, _ = self.gate(d, "--stop-hook", payload=self.payload(
+            d, ("user", "x"), ("say", "should work"), stop_hook_active=True))
+        self.assertEqual(rc, 0)
 
 
 class InstallStopHookTests(unittest.TestCase):

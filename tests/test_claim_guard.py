@@ -3,8 +3,9 @@
 Both numbers are regression guards on this repo:
   - naming: receipts.md keeps a row for every scripted claim, so thinning the
     red-flag list or dropping the delegation row fails here
-  - enforcement: the Stop hook really exits 2 on each planted mistake, and
-    really does not block clean work or loop on itself
+  - enforcement: the Stop hook really exits 2 on each planted mistake and on
+    each red-flag closing message, and really does not block honest work,
+    a message that only quotes the words, or loop on itself
 
 The scorer is also tested for the way it could flatter the prose: a row that
 names an excuse without saying what to do instead must not count.
@@ -59,35 +60,40 @@ class ScorerRejectsHalfAnswers(unittest.TestCase):
 
 
 class HookEnforcesWhatItCan(unittest.TestCase):
-    """The enforcement half, run for real against planted repos."""
+    """The enforcement half, run for real: planted repos, and closing messages."""
 
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory(prefix='rubric-claim-test-')
-        cls.stopped = CG.enforcement(cls.tmp.name)
-        cls.rc_clean, cls.rc_loop = CG.controls(cls.tmp.name)
+        cls.rows = CG.enforcement(cls.tmp.name)
+        cls.ctl = CG.controls(cls.tmp.name)
 
     @classmethod
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
     def test_every_planted_mistake_blocks_the_turn(self):
-        unblocked = sorted(i for i, (blocked, _) in self.stopped.items() if not blocked)
-        self.assertEqual(unblocked, [], 'the gate let these through: %s' % unblocked)
+        planted = {i: r['repo'] for i, r in self.rows.items() if r['repo']}
+        self.assertEqual(len(planted), 5, 'a fixture stopped planting; 5/12 would be vacuous')
+        self.assertEqual(sorted(i for i, (ok, _) in planted.items() if not ok), [])
 
-    def test_the_planted_set_is_not_empty(self):
-        """A fixture that stopped planting anything would score 5/12 vacuously."""
-        self.assertEqual(len(self.stopped), 5)
+    def test_wording_alone_blocks_the_red_flag_cases(self):
+        """On a clean repo, only the closing message can trip the hook."""
+        by_words = sorted(i for i, r in self.rows.items() if r['words'][0])
+        self.assertEqual(by_words, ['confident', 'looks_right', 'should_work'])
 
-    def test_clean_work_is_not_blocked(self):
-        self.assertEqual(self.rc_clean, 0)
+    def test_excuses_without_red_flag_words_are_not_blocked_on_words(self):
+        """The word check is a list, not a judge: it must not overreach."""
+        for i in ('subagent_said_done', 'everything_asked', 'types_check'):
+            self.assertFalse(self.rows[i]['words'][0], i)
 
-    def test_the_loop_guard_holds(self):
-        self.assertEqual(self.rc_loop, 0)
+    def test_honest_work_is_never_blocked_and_the_loop_guard_holds(self):
+        self.assertEqual({k: v for k, v in self.ctl.items() if v != 0}, {})
+        self.assertEqual(len(self.ctl), 3)
 
     def test_the_gap_between_prose_and_script_is_reported(self):
         """The eval's point is the claims no script can see; keep them countable."""
-        self.assertEqual(len(CG.CASES) - len(self.stopped), 7)
+        self.assertEqual(sum(1 for r in self.rows.values() if not CG.blocked(r)), 6)
 
 
 class EvalRuns(unittest.TestCase):
@@ -98,8 +104,9 @@ class EvalRuns(unittest.TestCase):
         with contextlib.redirect_stdout(buf):
             rc = CG.main(['--quiet'])
         self.assertEqual(rc, 0)
-        self.assertIn('12/12', buf.getvalue())
-        self.assertIn('5/12', buf.getvalue())
+        out = buf.getvalue()
+        for figure in ('12/12', '5/12', '3/12', '6/12'):
+            self.assertIn(figure, out)
 
 
 if __name__ == '__main__':
